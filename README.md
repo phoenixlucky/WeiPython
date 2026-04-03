@@ -1,4 +1,4 @@
-# 尉Python环境管理器
+# WeiPython / 尉Python环境管理器
 
 尉Python环境管理器是一个基于 Node.js 与 Electron 的本地桌面工具，用来统一管理 Python、Conda、venv 与 pip 包操作。项目当前采用本地 HTTP 服务 + Electron 桌面壳的结构，适合在 Windows 环境下直接打包为 `exe` 安装程序。
 
@@ -14,7 +14,7 @@
 ## 项目结构
 
 ```text
-pythonBB/
+WeiPython/
 ├── electron/                   # Electron 主进程
 ├── public/                     # 前端静态资源
 ├── src/                        # 本地 HTTP 服务与业务逻辑
@@ -63,7 +63,7 @@ npm run dist
 默认输出：
 
 ```text
-dist/WeiPython-Setup-2.1.10.exe
+dist/WeiPython-Setup-2.3.2.exe
 ```
 
 如果只想生成解包后的目录产物：
@@ -78,15 +78,16 @@ npm run pack
 
 - 软件名称：`尉Python环境管理器`
 - 可执行文件：`WeiPython.exe`
-- 安装包文件名：`WeiPython-Setup-2.1.10.exe`
+- 安装包文件名：`WeiPython-Setup-2.3.2.exe`
 - 默认安装目录：`D:\Program Files\WeiPython`
 - 安装模式：仅支持机器级安装，不再显示“仅为我安装”
+- GitHub 仓库：`https://github.com/phoenixlucky/WeiPython`
 
 相关配置文件：
 
-- [`package.json`](/d:/home/pythonBB/package.json)
-- [`build/installer.nsh`](/d:/home/pythonBB/build/installer.nsh)
-- [`build/icon.ico`](/d:/home/pythonBB/build/icon.ico)
+- `package.json`
+- `build/installer.nsh`
+- `build/icon.ico`
 
 ## 常用操作
 
