@@ -9,6 +9,9 @@ const state = {
 const elements = {
   statusPill: document.querySelector("#statusPill"),
   globalMessage: document.querySelector("#globalMessage"),
+  runtimeBanner: document.querySelector("#runtimeBanner"),
+  runtimeBannerPill: document.querySelector("#runtimeBannerPill"),
+  runtimeBannerMessage: document.querySelector("#runtimeBannerMessage"),
   heroNodeVersion: document.querySelector("#heroNodeVersion"),
   heroCondaState: document.querySelector("#heroCondaState"),
   overviewStats: document.querySelector("#overviewStats"),
@@ -51,15 +54,57 @@ const elements = {
 
 let confirmResolver = null;
 let operationProgressTimer = null;
+let runtimeBannerHideTimer = null;
+
+function clearRuntimeBannerHideTimer() {
+  if (runtimeBannerHideTimer) {
+    clearTimeout(runtimeBannerHideTimer);
+    runtimeBannerHideTimer = null;
+  }
+}
+
+function hideRuntimeBanner() {
+  if (!elements.runtimeBanner) {
+    return;
+  }
+
+  elements.runtimeBanner.classList.add("hidden");
+}
+
+function setRuntimeBanner(state, title, message) {
+  if (!elements.runtimeBanner) {
+    return;
+  }
+
+  clearRuntimeBannerHideTimer();
+  elements.runtimeBanner.classList.remove("hidden");
+  elements.runtimeBanner.dataset.state = state;
+  elements.runtimeBannerPill.textContent = title;
+  elements.runtimeBannerMessage.textContent = message;
+
+  if (state !== "busy") {
+    runtimeBannerHideTimer = setTimeout(() => {
+      hideRuntimeBanner();
+    }, 3000);
+  }
+}
 
 function setBusy(message) {
   elements.statusPill.textContent = "处理中";
   elements.globalMessage.textContent = message;
+  setRuntimeBanner("busy", "处理中", message);
 }
 
 function setReady(message = "等待操作。") {
   elements.statusPill.textContent = "就绪";
   elements.globalMessage.textContent = message;
+  setRuntimeBanner("ready", "就绪", message);
+}
+
+function setError(message) {
+  elements.statusPill.textContent = "异常";
+  elements.globalMessage.textContent = message;
+  setRuntimeBanner("error", "异常", message);
 }
 
 function escapeHtml(value) {
@@ -307,13 +352,19 @@ function renderCondaList() {
     ? state.conda
         .map(
           (env) => `
-            <article class="list-item">
-              <strong>${escapeHtml(env.name)}</strong>
-              <span class="list-meta">Python ${escapeHtml(env.pythonVersion)}</span>
-              <span class="list-meta">${escapeHtml(env.path)}</span>
-              <span class="list-meta">${env.base ? "base 环境不可删除" : ""}</span>
-              <div class="list-actions">
-                ${env.base ? "" : `<button class="ghost-button" data-delete-conda="${escapeHtml(env.name)}">删除</button>`}
+            <article class="conda-bookmark-card">
+              <div class="conda-bookmark-head">
+                <div class="conda-bookmark-title">
+                  <strong>${escapeHtml(env.name)}</strong>
+                  <span class="conda-bookmark-meta">Python ${escapeHtml(env.pythonVersion)}</span>
+                </div>
+                <div class="conda-bookmark-actions">
+                  ${env.base ? "" : `<button class="ghost-button" data-delete-conda="${escapeHtml(env.name)}">删除</button>`}
+                </div>
+              </div>
+              <span class="conda-bookmark-path" title="${escapeHtml(env.path)}">${escapeHtml(env.path)}</span>
+              <div class="conda-bookmark-foot">
+                <span class="conda-bookmark-state${env.base ? " base" : ""}">${env.base ? "base 环境" : "普通环境"}</span>
               </div>
             </article>
           `
@@ -594,14 +645,71 @@ async function createCondaEnvironment(event) {
   }
 
   setBusy(`正在创建环境 ${payload.name}...`);
-  const result = await request("/api/conda/environments", {
-    method: "POST",
-    body: JSON.stringify(payload)
+  const submitButton = form.querySelector('button[type="submit"]');
+  const progress = startOperationProgress({
+    eyebrow: "Provisioning",
+    title: "正在创建 Conda 环境",
+    message: `目标环境：${payload.name || "<未填写>"}`,
+    steps:
+      mode === "python"
+        ? [
+            "校验环境名称与 Python 版本",
+            "调用 Conda 创建新环境",
+            "安装额外包",
+            "刷新环境列表"
+          ]
+        : [
+            "校验源环境与克隆策略",
+            "准备目标环境配置",
+            "调用 Conda 创建或克隆环境",
+            "刷新环境列表"
+          ],
+    extraLines:
+      mode === "python"
+        ? [
+            `创建方式: 按 Python 版本创建`,
+            `Python 版本: ${payload.pythonVersion || "latest"}`,
+            `额外包: ${payload.packages?.length ? payload.packages.join(", ") : "无"}`
+          ]
+        : [
+            "创建方式: 基于已有环境创建",
+            `源环境: ${payload.sourceName || "<未选择>"}`,
+            `克隆 Python: ${payload.clonePython ? "是" : "否"}`,
+            `克隆包: ${payload.clonePackages ? "是" : "否"}`
+          ]
   });
-  await loadCondaEnvironments({ silent: true });
-  renderOverview();
-  elements.globalMessage.textContent = result.message;
-  setReady(result.message);
+
+  if (submitButton) {
+    submitButton.disabled = true;
+  }
+
+  try {
+    const result = await request("/api/conda/environments", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    await loadCondaEnvironments({ silent: true });
+    renderOverview();
+    elements.globalMessage.textContent = result.message;
+    setReady(result.message);
+    progress.complete({
+      title: "Conda 环境创建完成",
+      message: `环境“${payload.name}”已创建完成。`,
+      details: result.message
+    });
+  } catch (error) {
+    setError(error.message);
+    progress.fail({
+      title: "Conda 环境创建失败",
+      message: `环境“${payload.name || "<未填写>"}”创建未完成。`,
+      details: error.message
+    });
+    throw error;
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+    }
+  }
 }
 
 async function exportCondaEnvironment(event) {
@@ -1093,7 +1201,7 @@ function wireCondaForm() {
     try {
       await createCondaEnvironment(event);
     } catch (error) {
-      setReady(error.message);
+      setError(error.message);
       alert(error.message);
     }
   });

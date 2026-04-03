@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
+    <div class="runtime-banner hidden" id="runtimeBanner" data-state="ready" aria-live="polite">
+      <div class="runtime-banner-head">
+        <span class="runtime-banner-pill" id="runtimeBannerPill">就绪</span>
+        <span class="runtime-banner-label">Runtime Status</span>
+      </div>
+      <p class="runtime-banner-message" id="runtimeBannerMessage">等待操作。</p>
+    </div>
+
     <div class="app-shell">
       <aside class="sidebar">
         <div class="sidebar-panel brand-block">
@@ -267,7 +275,7 @@
                   </div>
                   <span class="collapse-meta" id="condaInventoryMeta">0 个环境</span>
                 </summary>
-                <div id="condaList" class="list-stack compact-list collapse-body"></div>
+                <div id="condaList" class="collapse-body conda-bookmark-list"></div>
               </details>
             </div>
           </div>
