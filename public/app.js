@@ -285,7 +285,7 @@ function renderOverview() {
     return;
   }
 
-  elements.heroNodeVersion.textContent = `Node ${overview.nodeVersion || "-"}`;
+  elements.heroNodeVersion.textContent = `系统 Node ${overview.systemNodeVersion || overview.nodeVersion || "-"}`;
   elements.heroCondaState.textContent = overview.condaAvailable || overview.condaPath ? "Conda 已连接" : "Conda 未检测到";
 
   const stats = [
@@ -293,6 +293,7 @@ function renderOverview() {
     ["当前目录", overview.currentDirectory || "-"],
     ["Pip", overview.pipVersion || "-"],
     ["系统 Node", overview.systemNodeVersion || "-"],
+    ["应用 Node", overview.nodeVersion || "-"],
     ["npm", overview.npmVersion || "-"],
     ["主机", overview.hostname || "-"]
   ];
