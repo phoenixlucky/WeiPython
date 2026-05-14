@@ -1,6 +1,6 @@
 {
   "name": "pythonbb-web",
-  "version": "2.3.3",
+  "version": "2.4.0",
   "private": true,
   "description": "Python Environment Management Tool",
   "author": "Ethan Wilkins",
@@ -13,7 +13,7 @@
     "dist": "electron-builder --win nsis"
   },
   "devDependencies": {
-    "electron": "^35.0.0",
+    "electron": "^42.0.1",
     "electron-builder": "^26.0.12"
   },
   "build": {
