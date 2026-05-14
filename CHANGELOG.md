@@ -1,4 +1,34 @@
 # 更新日志
+## v2.3.3 - 系统 Node.js 升级入口 (2026-05-14)
+
+### 🚀 新增功能
+
+#### Windows 系统 Node.js 升级
+- ✅ 在概览页面新增“升级 Node.js”操作入口
+- ✅ 支持优先通过 `nvm-windows` 执行 `nvm install latest` 与 `nvm use`
+- ✅ 未检测到 nvm 时自动回退到 `winget upgrade --id OpenJS.NodeJS.LTS`
+
+### 🛠 优化调整
+
+#### 运行时信息展示
+- ✅ 概览页面新增系统 Node 与 npm 版本展示
+- ✅ 升级完成后自动刷新系统运行时信息
+- ✅ 明确提示 Electron 内置 Node 与系统 Node.js 的版本边界
+
+### 🔧 技术改进
+
+#### 后端升级接口
+- ✅ 新增 `/api/node/upgrade` 接口统一处理 nvm 与 winget 升级流程
+- ✅ 增加升级前后版本、执行工具与命令输出反馈
+- ✅ 为 Node/npm 探测命令增加超时控制，避免概览刷新长期阻塞
+
+### 📦 本次产物
+
+- 安装包文件名：`WeiPython-Setup-2.3.3.exe`
+- 发布类型：Windows NSIS 安装包
+
+---
+
 ## v2.3.2 - Conda 清单布局与运行状态提示优化 (2026-04-03)
 
 ### 🚀 新增功能

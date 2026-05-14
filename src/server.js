@@ -28,7 +28,7 @@ import {
   upgradeAllPackages,
   upgradePip
 } from "./services/package-service.js";
-import { getSystemOverview } from "./services/system-service.js";
+import { getSystemOverview, upgradeNodeVersion } from "./services/system-service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,6 +99,11 @@ async function handleApi(request, response, pathname, searchParams) {
 
     if (request.method === "GET" && pathname === "/api/overview") {
       sendJson(response, 200, await getSystemOverview(preferredCondaRoot));
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/node/upgrade") {
+      sendJson(response, 200, await upgradeNodeVersion());
       return;
     }
 

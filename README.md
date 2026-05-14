@@ -10,6 +10,7 @@
 - 创建、删除 `venv` 虚拟环境
 - 在不同环境中安装、升级、卸载 Python 包
 - 查看包详情、列出已安装包、从 `requirements.txt` 批量安装
+- 在 Windows 上通过 `nvm-windows` 或 `winget` 升级系统 Node.js
 
 ## 项目结构
 
@@ -63,7 +64,7 @@ npm run dist
 默认输出：
 
 ```text
-dist/WeiPython-Setup-2.3.2.exe
+dist/WeiPython-Setup-2.3.3.exe
 ```
 
 如果只想生成解包后的目录产物：
@@ -78,7 +79,7 @@ npm run pack
 
 - 软件名称：`尉Python环境管理器`
 - 可执行文件：`WeiPython.exe`
-- 安装包文件名：`WeiPython-Setup-2.3.2.exe`
+- 安装包文件名：`WeiPython-Setup-2.3.3.exe`
 - 默认安装目录：`D:\Program Files\WeiPython`
 - 安装模式：仅支持机器级安装，不再显示“仅为我安装”
 - GitHub 仓库：`https://github.com/phoenixlucky/WeiPython`
@@ -113,8 +114,18 @@ npm run pack
 3. 输入包名或从已安装包下拉中选择
 4. 执行安装、升级、卸载、查询信息或从 `requirements.txt` 安装
 
+### 升级 Node.js
+
+1. 进入 `概览` 页面
+2. 点击 `升级 Node.js`
+3. 确认后程序会优先调用 `nvm install latest` 与 `nvm use <version>`；未检测到 nvm 时，调用 `winget upgrade --id OpenJS.NodeJS.LTS`
+4. 执行完成后概览会刷新系统 Node 与 npm 版本
+
+说明：桌面版 Electron 内置的 Node 版本随应用安装包更新；此功能升级的是系统 Node.js，不会改变当前已运行 Electron 进程内的 Node 版本。
+
 ## 说明
 
 - 当前项目主要面向 Windows 使用场景
 - Conda 与 pip 的实际执行结果依赖本机环境权限、网络和安装状态
+- Node.js 升级依赖本机已启用 `nvm-windows` 或 `winget`，可能需要管理员权限或重新打开终端后 PATH 才会刷新
 - 如果安装器默认目录、图标或品牌资源需要继续微调，可以直接修改 `build/` 目录中的资源和 NSIS 配置

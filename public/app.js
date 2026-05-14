@@ -49,6 +49,7 @@ const elements = {
   operationDetails: document.querySelector("#operationDetails"),
   operationCloseButton: document.querySelector("#operationCloseButton"),
   refreshInstalledPackagesButton: document.querySelector("#refreshInstalledPackagesButton"),
+  upgradeNodeButton: document.querySelector("#upgradeNodeButton"),
   upgradeAllPackagesButton: document.querySelector("#upgradeAllPackagesButton")
 };
 
@@ -291,6 +292,8 @@ function renderOverview() {
     ["平台", `${overview.platform || "-"} / ${overview.arch || "-"}`],
     ["当前目录", overview.currentDirectory || "-"],
     ["Pip", overview.pipVersion || "-"],
+    ["系统 Node", overview.systemNodeVersion || "-"],
+    ["npm", overview.npmVersion || "-"],
     ["主机", overview.hostname || "-"]
   ];
   if (overview.condaPath) {
@@ -525,6 +528,58 @@ async function loadOverview() {
   renderCondaList();
   refreshPackageTargets();
   setReady("系统信息已刷新。");
+}
+
+async function upgradeNodeVersion() {
+  const confirmed = await askConfirm({
+    title: "升级 Node.js",
+    message:
+      "将优先通过 nvm-windows 升级当前系统 Node；未检测到 nvm 时会改用 winget 升级 Node.js LTS。桌面版 Electron 内置的 Node 版本需要随应用安装包更新。",
+    confirmText: "确认升级"
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  setBusy("正在升级系统 Node.js...");
+  const progress = startOperationProgress({
+    eyebrow: "Node.js",
+    title: "正在升级 Node.js",
+    message: "正在检测可用的 Node.js 版本管理工具。",
+    steps: ["检查当前 Node.js 版本", "选择 nvm-windows 或 winget 升级 Node.js", "刷新系统运行时信息"],
+    extraLines: ["此操作可能需要几分钟，过程中请不要关闭窗口。"],
+    stepIntervalMs: 1800
+  });
+
+  try {
+    const result = await request("/api/node/upgrade", {
+      method: "POST",
+      timeoutMs: 650000,
+      body: JSON.stringify({})
+    });
+    await loadOverview();
+    progress.complete({
+      title: "Node.js 升级检查完成",
+      message: result.message,
+      details: [
+        `升级工具: ${result.manager}`,
+        `升级前: ${result.beforeVersion}`,
+        `升级后: ${result.afterVersion}`,
+        "",
+        result.runtimeNote,
+        "",
+        result.output || "winget 未返回详细输出。"
+      ].join("\n")
+    });
+    setReady(result.message);
+  } catch (error) {
+    progress.fail({
+      title: "Node.js 升级失败",
+      message: "系统 Node.js 未完成升级。",
+      details: error.message
+    });
+    setReady(error.message);
+  }
 }
 
 async function loadCondaEnvironments(options = {}) {
@@ -1456,6 +1511,15 @@ async function bootstrap() {
     try {
       await loadOverview();
     } catch (error) {
+      alert(error.message);
+    }
+  });
+
+  elements.upgradeNodeButton.addEventListener("click", async () => {
+    try {
+      await upgradeNodeVersion();
+    } catch (error) {
+      setReady(error.message);
       alert(error.message);
     }
   });
