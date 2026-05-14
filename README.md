@@ -31,7 +31,6 @@ WeiPython/
 
 ```bash
 npm install
-npm install electron@latest
 ```
 
 ### 2. 启动 Web 服务
