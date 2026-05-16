@@ -64,7 +64,7 @@ npm run dist
 默认输出：
 
 ```text
-dist/WeiPython-Setup-2.4.0.exe
+dist/WeiPython-Setup-2.5.0.exe
 ```
 
 如果只想生成解包后的目录产物：
@@ -78,8 +78,9 @@ npm run pack
 当前 Windows 安装器品牌配置如下：
 
 - 软件名称：`尉Python环境管理器`
+- 软件公司：`尉缭子科技`
 - 可执行文件：`WeiPython.exe`
-- 安装包文件名：`WeiPython-Setup-2.4.0.exe`
+- 安装包文件名：`WeiPython-Setup-2.5.0.exe`
 - 默认安装目录：`D:\Program Files\WeiPython`
 - 安装模式：仅支持机器级安装，不再显示“仅为我安装”
 - GitHub 仓库：`https://github.com/phoenixlucky/WeiPython`

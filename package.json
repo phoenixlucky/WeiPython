@@ -1,9 +1,9 @@
 {
   "name": "pythonbb-web",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "description": "Python Environment Management Tool",
-  "author": "Ethan Wilkins",
+  "author": "尉缭子科技",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -20,7 +20,7 @@
     "appId": "com.weipython.desktop",
     "productName": "WeiPython Manager",
     "executableName": "WeiPython",
-    "copyright": "© Ethan Wilkins",
+    "copyright": "© 尉缭子科技",
     "icon": "build/icon.ico",
     "asar": false,
     "npmRebuild": false,

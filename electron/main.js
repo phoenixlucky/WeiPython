@@ -8,7 +8,7 @@ let serverHandle = null;
 
 const APP_NAME = "WeiPython Manager";
 const APP_NAME_ZH = "尉Python 环境管理器";
-const APP_AUTHOR = "Ethan Wilkins";
+const APP_AUTHOR = "尉缭子科技";
 const APP_ID = "com.weipython.desktop";
 const APP_DESCRIPTION_ZH =
   "尉 Python 环境管理器是一款基于 Node.js 与 Electron 的本地桌面工具，用于统一管理 Python、Conda 和 venv 虚拟环境。支持环境创建、克隆、删除，以及 Python 包的安装、升级和卸载，并提供安装过程可视化与日志反馈，适用于开发环境管理和日常包维护场景。";
