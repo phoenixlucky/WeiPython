@@ -6,6 +6,10 @@ import { runCommand } from "../utils/process.js";
 const IS_WINDOWS = process.platform === "win32";
 const SUPPORTED_PYTHON_VERSIONS = ["3.14", "3.13", "3.12", "3.11", "3.10", "3.9"];
 
+// 缓存：避免每次调用 detectCondaExecutable 重复扫描 10+ 路径
+let cachedCondaExecutable = null;
+let cachedPreferredRoot = null;
+
 function dedupeBy(items, keyFn) {
   const seen = new Set();
   return items.filter((item) => {
@@ -153,7 +157,17 @@ async function isBrokenCondaEnvironmentDirectory(envPath) {
   return !hasCondaMeta || !hasHistory;
 }
 
+export function clearCondaCache() {
+  cachedCondaExecutable = null;
+  cachedPreferredRoot = null;
+}
+
 export async function detectCondaExecutable(preferredRoot = "") {
+  // 如果 preferredRoot 没变且有缓存，直接返回缓存结果
+  if (cachedCondaExecutable !== null && cachedPreferredRoot === preferredRoot) {
+    return cachedCondaExecutable;
+  }
+
   const home = os.homedir();
   const candidates = [];
   const envCandidates = [
@@ -192,10 +206,14 @@ export async function detectCondaExecutable(preferredRoot = "") {
 
   for (const candidate of [...new Set(candidates)]) {
     if (await pathExists(candidate)) {
+      cachedCondaExecutable = candidate;
+      cachedPreferredRoot = preferredRoot;
       return candidate;
     }
   }
 
+  cachedCondaExecutable = null;
+  cachedPreferredRoot = preferredRoot;
   return null;
 }
 

@@ -277,6 +277,11 @@ function switchPanel(panelName) {
   document.querySelectorAll(".panel").forEach((panel) => {
     panel.classList.toggle("active", panel.id === `panel-${panelName}`);
   });
+
+  // 首次切换到包管理面板时懒加载已安装包
+  if (panelName === "packages" && !state.installedPackages.length) {
+    loadInstalledPackages({ silent: true }).catch(() => {});
+  }
 }
 
 function renderOverview() {
@@ -1527,10 +1532,8 @@ async function bootstrap() {
 
   try {
     await loadOverview();
-    loadCondaEnvironments({ silent: true }).catch((error) => setReady(`Conda 环境刷新失败: ${error.message}`));
+    state.pythonVersionsLoaded = true;
     loadVenvs({ silent: true }).catch((error) => setReady(`虚拟环境扫描失败: ${error.message}`));
-    loadInstalledPackages({ silent: true });
-    loadPythonVersions();
   } catch (error) {
     setReady(error.message);
     alert(error.message);

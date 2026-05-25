@@ -10,45 +10,49 @@ function withTimeout(promise, timeoutMs, fallbackValue) {
   ]);
 }
 
+async function detectPipVersion() {
+  try {
+    const result = await runCommand(
+      process.platform === "win32" ? "python" : "python3",
+      ["-m", "pip", "--version"],
+      { timeoutMs: 3000 }
+    );
+    return result.ok ? result.stdout.trim() : "未找到";
+  } catch {
+    return "未找到";
+  }
+}
+
+async function detectNodeVersion() {
+  try {
+    const result = await runCommand("node", ["--version"], { timeoutMs: 5000 });
+    return result.ok ? result.stdout.trim() : "未找到";
+  } catch {
+    return "未找到";
+  }
+}
+
+async function detectNpmVersion() {
+  try {
+    const result = await runCommand("npm", ["--version"], { timeoutMs: 5000 });
+    return result.ok ? result.stdout.trim() : "未找到";
+  } catch {
+    return "未找到";
+  }
+}
+
 export async function getSystemOverview(preferredRoot = "") {
-  const [pythonVersions, condaInfo] = await Promise.all([
+  const [pythonVersions, condaInfo, pipVersion, systemNodeVersion, npmVersion] = await Promise.all([
     withTimeout(discoverPythonVersions(), 1500, []),
     withTimeout(listCondaEnvironments(preferredRoot), 2000, {
       condaAvailable: false,
       condaPath: null,
       environments: []
-    })
+    }),
+    withTimeout(detectPipVersion(), 3000, "未找到"),
+    withTimeout(detectNodeVersion(), 5000, "未找到"),
+    withTimeout(detectNpmVersion(), 5000, "未找到")
   ]);
-
-  let pipVersion = "未找到";
-  let systemNodeVersion = "未找到";
-  let npmVersion = "未找到";
-  try {
-    const result = await runCommand(process.platform === "win32" ? "python" : "python3", ["-m", "pip", "--version"]);
-    if (result.ok) {
-      pipVersion = result.stdout.trim();
-    }
-  } catch {
-    pipVersion = "未找到";
-  }
-
-  try {
-    const result = await runCommand("node", ["--version"], { timeoutMs: 5000 });
-    if (result.ok) {
-      systemNodeVersion = result.stdout.trim();
-    }
-  } catch {
-    systemNodeVersion = "未找到";
-  }
-
-  try {
-    const result = await runCommand("npm", ["--version"], { timeoutMs: 5000 });
-    if (result.ok) {
-      npmVersion = result.stdout.trim();
-    }
-  } catch {
-    npmVersion = "未找到";
-  }
 
   return {
     platform: process.platform,
