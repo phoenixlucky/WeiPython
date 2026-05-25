@@ -3,6 +3,7 @@ const state = {
   conda: [],
   venvs: [],
   pythonVersionsLoaded: false,
+  condaLoading: false,
   installedPackages: []
 };
 
@@ -346,10 +347,19 @@ function renderOverview() {
           `
         )
         .join("")
-    : `<article class="list-item"><strong>${overview.condaPath ? "Conda 已连接" : "未检测到 Conda"}</strong><span class="list-meta">${overview.condaPath ? "当前未读取到环境列表。你仍然可以尝试创建新环境。" : "请先确认 conda 安装路径或系统环境变量。"}</span></article>`;
+    : state.condaLoading
+      ? `<article class="list-item"><strong>正在扫描 Conda 环境...</strong></article>`
+      : `<article class="list-item"><strong>${overview.condaPath ? "Conda 已连接" : "未检测到 Conda"}</strong><span class="list-meta">${overview.condaPath ? "当前未读取到环境列表。你仍然可以尝试创建新环境。" : "请先确认 conda 安装路径或系统环境变量。"}</span></article>`;
 }
 
 function renderCondaList() {
+  if (state.condaLoading) {
+    elements.condaInventoryMeta.textContent = "扫描中...";
+    elements.condaSourceSelect.innerHTML = "";
+    elements.condaExportSourceSelect.innerHTML = "";
+    elements.condaList.innerHTML = '<article class="list-item"><strong>正在扫描 Conda 环境...</strong></article>';
+    return;
+  }
   elements.condaInventoryMeta.textContent = `${state.conda.length} 个环境`;
   const condaOptions = state.conda
     .map((env) => `<option value="${escapeHtml(env.name)}">${escapeHtml(env.name)} · Python ${escapeHtml(env.pythonVersion)}</option>`)
@@ -589,12 +599,14 @@ async function upgradeNodeVersion() {
 }
 
 async function loadCondaEnvironments(options = {}) {
+  state.condaLoading = true;
   if (!options.silent) {
     setBusy("正在刷新 Conda 环境...");
   }
 
   const result = await request("/api/conda/environments");
   state.conda = result.environments || [];
+  state.condaLoading = false;
 
   if (!state.overview) {
     state.overview = {};
@@ -1533,6 +1545,8 @@ async function bootstrap() {
   try {
     await loadOverview();
     state.pythonVersionsLoaded = true;
+    // 后台刷新 Conda 环境（loadOverview 可能超时，此调用兜底）
+    loadCondaEnvironments({ silent: true }).catch(() => {});
     loadVenvs({ silent: true }).catch((error) => setReady(`虚拟环境扫描失败: ${error.message}`));
   } catch (error) {
     setReady(error.message);

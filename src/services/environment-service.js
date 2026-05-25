@@ -230,20 +230,25 @@ export async function runCondaCommand(args, preferredRoot = "") {
   return runCommand(condaExecutable, args);
 }
 
+async function batchGetPythonVersion(executables) {
+  const results = await Promise.all(
+    executables.map((execPath) =>
+      getPythonVersion(execPath).catch(() => "Unknown")
+    )
+  );
+  return results;
+}
+
 export async function listCondaEnvironments(preferredRoot = "") {
   const condaExecutable = await detectCondaExecutable(preferredRoot);
   if (!condaExecutable) {
     return { condaAvailable: false, condaPath: null, environments: [] };
   }
 
-  const fallbackEnvironments = [];
+  const fallbackEntries = [];
   const condaRoot = getCondaRootFromExecutable(condaExecutable);
   if (condaRoot && (await pathExists(condaRoot))) {
-    fallbackEnvironments.push({
-      name: "base",
-      path: condaRoot,
-      pythonVersion: await getPythonVersion(getCondaPythonExecutable(condaRoot))
-    });
+    fallbackEntries.push({ name: "base", path: condaRoot });
 
     const envsDir = path.join(condaRoot, "envs");
     if (await pathExists(envsDir)) {
@@ -253,18 +258,23 @@ export async function listCondaEnvironments(preferredRoot = "") {
           if (!entry.isDirectory()) {
             continue;
           }
-          const envPath = path.join(envsDir, entry.name);
-          fallbackEnvironments.push({
-            name: entry.name,
-            path: envPath,
-            pythonVersion: await getPythonVersion(getCondaPythonExecutable(envPath))
-          });
+          fallbackEntries.push({ name: entry.name, path: path.join(envsDir, entry.name) });
         }
       } catch {
         // ignore and keep partial fallback list
       }
     }
   }
+
+  // 并行检测所有回退环境的 Python 版本
+  const fallbackPythonVersions = await batchGetPythonVersion(
+    fallbackEntries.map((e) => getCondaPythonExecutable(e.path))
+  );
+  const fallbackEnvironments = fallbackEntries.map((entry, i) => ({
+    name: entry.name,
+    path: entry.path,
+    pythonVersion: fallbackPythonVersions[i]
+  }));
 
   let result;
   try {
@@ -289,12 +299,18 @@ export async function listCondaEnvironments(preferredRoot = "") {
   const envDetails = data.envs_details || {};
   const environments = [...fallbackEnvironments];
 
-  for (const envPath of data.envs || []) {
+  // 收集 JSON 返回的环境路径，并行检测 Python 版本
+  const jsonEnvPaths = data.envs || [];
+  const jsonPythonExes = jsonEnvPaths.map((envPath) => getCondaPythonExecutable(envPath));
+  const jsonPythonVersions = await batchGetPythonVersion(jsonPythonExes);
+
+  for (let i = 0; i < jsonEnvPaths.length; i++) {
+    const envPath = jsonEnvPaths[i];
     const details = envDetails[envPath] || envDetails[envPath.toLowerCase()] || {};
     environments.push({
       name: details.name || path.basename(envPath),
       path: envPath,
-      pythonVersion: await getPythonVersion(getCondaPythonExecutable(envPath)),
+      pythonVersion: jsonPythonVersions[i],
       writable: details.writable ?? null,
       base: details.base ?? path.basename(envPath).toLowerCase() === "base"
     });

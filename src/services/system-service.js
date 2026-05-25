@@ -44,7 +44,7 @@ async function detectNpmVersion() {
 export async function getSystemOverview(preferredRoot = "") {
   const [pythonVersions, condaInfo, pipVersion, systemNodeVersion, npmVersion] = await Promise.all([
     withTimeout(discoverPythonVersions(), 1500, []),
-    withTimeout(listCondaEnvironments(preferredRoot), 2000, {
+    withTimeout(listCondaEnvironments(preferredRoot), 5000, {
       condaAvailable: false,
       condaPath: null,
       environments: []
