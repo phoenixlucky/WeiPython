@@ -1,4 +1,19 @@
 # 更新日志
+## v2.5.2 - 修复 Conda 环境读取过慢 (2026-05-17)
+
+### 🐛 Bug 修复
+
+- ✅ **Python 版本检测并行化**：将 `listCondaEnvironments` 中串行的 `getPythonVersion` 改为 `Promise.all` 批量并行执行，N 个环境耗时从 N×t 降为 1×t
+- ✅ **延长超时**：`getSystemOverview` 中 conda 检测超时从 2000ms 提升至 5000ms，避免 conda env list 慢时超时返回空数据
+- ✅ **后台刷新兜底**：`loadOverview` 后异步执行 `loadCondaEnvironments`，确保数据最终到达
+- ✅ **加载状态提示**：数据到达前展示「正在扫描 Conda 环境...」，避免用户误以为程序卡死
+
+### 📦 本次产物
+
+- 安装包文件名：`WeiPython-Setup-2.5.2.exe`
+- 发布类型：Windows NSIS 安装包
+
+---
 ## v2.5.1 - 启动性能优化 (2026-05-17)
 
 ### 🚀 性能优化
