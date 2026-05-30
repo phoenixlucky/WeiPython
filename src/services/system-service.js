@@ -34,7 +34,8 @@ async function detectNodeVersion() {
 
 async function detectNpmVersion() {
   try {
-    const result = await runCommand("npm", ["--version"], { timeoutMs: 5000 });
+    // Windows 上 npm 是 npm.cmd，需要 shell: true 让 spawn 通过 cmd.exe 解析
+    const result = await runCommand("npm", ["--version"], { timeoutMs: 5000, shell: true });
     return result.ok ? result.stdout.trim() : "未找到";
   } catch {
     return "未找到";
