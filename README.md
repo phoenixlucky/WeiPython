@@ -64,7 +64,7 @@ npm run dist
 默认输出：
 
 ```text
-dist/WeiPython-Setup-2.5.2.exe
+dist/WeiPython-Setup.exe
 ```
 
 如果只想生成解包后的目录产物：
