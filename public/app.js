@@ -62,7 +62,12 @@ const elements = {
   condaPythonVersionsList: document.querySelector("#condaPythonVersionsList"),
   condaPythonVersionsMeta: document.querySelector("#condaPythonVersionsMeta"),
   refreshCondaPythonVersionsButton: document.querySelector("#refreshCondaPythonVersionsButton"),
-  condaChannelRadios: document.querySelectorAll("input[name='condaChannel']")
+  condaChannelRadios: document.querySelectorAll("input[name='condaChannel']"),
+  condaPythonVersionSelect: document.querySelector("#condaPythonVersionSelect"),
+  condaClonePythonVersionSelect: document.querySelector("#condaClonePythonVersionSelect"),
+  condaCreateChannelSelect: document.querySelector("#condaCreateChannelSelect"),
+  condaCloneChannelSelect: document.querySelector("#condaCloneChannelSelect"),
+  refreshCondaCreateVersionsButton: document.querySelector("#refreshCondaCreateVersionsButton")
 };
 
 let confirmResolver = null;
@@ -463,6 +468,7 @@ function updateCondaSummary() {
       .filter(Boolean);
     lines.push("模式: 按 Python 版本创建");
     lines.push(`Python 版本: ${data.get("pythonVersion")}`);
+    lines.push(`Conda 源: ${elements.condaCreateChannelSelect.value}`);
     lines.push(`额外安装包: ${packages.length ? packages.join(", ") : "无"}`);
     lines.push("预计动作: 执行 conda create，并追加额外包参数。");
   } else {
@@ -472,11 +478,14 @@ function updateCondaSummary() {
     lines.push(`源环境: ${data.get("sourceName") || "<未选择>"}`);
     lines.push(`克隆内容: ${[clonePython ? "Python 版本" : "", clonePackages ? "已安装库" : ""].filter(Boolean).join(", ") || "未选择"}`);
     if (clonePython && clonePackages) {
+      lines.push(`Conda 源: ${elements.condaCloneChannelSelect.value}`);
       lines.push("预计动作: 使用 conda clone 完整复制。");
     } else if (clonePython) {
+      lines.push(`Conda 源: ${elements.condaCloneChannelSelect.value}`);
       lines.push("预计动作: 读取源环境 Python 版本并创建空环境。");
     } else if (clonePackages) {
       lines.push(`目标 Python 版本: ${data.get("targetPythonVersion")}`);
+      lines.push(`Conda 源: ${elements.condaCloneChannelSelect.value}`);
       lines.push(`导出策略: ${form.elements.explicitPackagesOnly.checked ? "仅显式安装包" : "完整环境依赖"}`);
       lines.push("预计动作: 导出环境 YAML，重写目标名称和 Python 版本后创建。");
     } else {
@@ -638,6 +647,8 @@ async function loadCondaEnvironments(options = {}) {
 // 已知的 Conda 大版本列表（与后端 SUPPORTED_PYTHON_VERSIONS 保持一致）
 const CONDA_MAJOR_VERSIONS = ["3.14", "3.13", "3.12", "3.11", "3.10", "3.9"];
 
+// ---------- Conda 版本缓存与查询 ----------
+
 function renderCondaMajorVersions() {
   const { condaSelectedMajor } = state;
 
@@ -659,22 +670,25 @@ function renderCondaPythonVersionDetails() {
 
   elements.condaVersionDetailCard.style.display = "";
   const channelLabel = condaChannel || "defaults";
+  const fromCache = condaFullVersions._fromCache;
+  const versions = Array.isArray(condaFullVersions) ? condaFullVersions : [];
+
   elements.condaVersionDetailTitle.textContent = `Python ${condaSelectedMajor} (${channelLabel})`;
   elements.condaPythonVersionsMeta.textContent = condaFullVersionsLoading
     ? "查询中..."
-    : `${condaFullVersions.length} 个构建`;
+    : `${versions.length} 个构建${fromCache ? "（缓存）" : ""}`;
 
   if (condaFullVersionsLoading) {
     elements.condaPythonVersionsList.innerHTML = '<article class="list-item"><strong>正在查询...</strong></article>';
     return;
   }
 
-  if (!condaFullVersions.length) {
+  if (!versions.length) {
     elements.condaPythonVersionsList.innerHTML = '<article class="list-item"><strong>未查询到可用版本</strong><span class="list-meta">请确认 Conda 连接正常</span></article>';
     return;
   }
 
-  elements.condaPythonVersionsList.innerHTML = condaFullVersions
+  elements.condaPythonVersionsList.innerHTML = versions
     .map(
       (ver) => `
         <article class="list-item" style="display:inline-flex;width:auto;padding:6px 14px">
@@ -692,27 +706,163 @@ function getSelectedChannel() {
   return "defaults";
 }
 
+// 从缓存中获取指定大版本的小版本列表
+function getCachedVersions(cache, major, channel) {
+  const channelKey = channel || "defaults";
+  const entry = cache?.channels?.[channelKey]?.[major];
+  return entry?.versions || null;
+}
+
+// 更新 Python 版本页面的详情显示（从缓存或查询结果）
+function showVersionsForMajor(major, channel, versions, fromCache) {
+  state.condaSelectedMajor = major;
+  state.condaChannel = channel;
+  versions._fromCache = fromCache;
+  state.condaFullVersions = versions;
+  state.condaFullVersionsLoading = false;
+  renderCondaMajorVersions();
+  renderCondaPythonVersionDetails();
+  // 同时填充创建表单的版本下拉
+  populateCreateFormVersions(major, versions);
+}
+
 async function loadCondaPythonVersions(version) {
   const major = version || state.condaSelectedMajor;
   if (!major) return;
 
-  state.condaSelectedMajor = major;
-  state.condaChannel = getSelectedChannel();
+  const channel = getSelectedChannel();
   state.condaFullVersionsLoading = true;
+  state.condaSelectedMajor = major;
+  state.condaChannel = channel;
   renderCondaMajorVersions();
   renderCondaPythonVersionDetails();
 
   try {
-    const params = new URLSearchParams({ version: major, channel: state.condaChannel });
+    // 先查缓存
+    const cacheResp = await request("/api/conda/python-versions/cache");
+    const cached = getCachedVersions(cacheResp, major, channel);
+    if (cached && cached.length) {
+      showVersionsForMajor(major, channel, [...cached], true);
+      setReady(`Python ${major}（${channel}）小版本已加载（缓存）。`);
+      return;
+    }
+
+    // 缓存缺失 → 在线查询
+    const params = new URLSearchParams({ version: major, channel });
     const result = await request(`/api/conda/python-versions?${params}`);
-    state.condaFullVersions = result.versions || [];
+    const versions = result.versions || [];
+    showVersionsForMajor(major, channel, versions, false);
+    setReady(`Python ${major}（${channel}）小版本已加载。`);
   } catch {
     state.condaFullVersions = [];
+    state.condaFullVersionsLoading = false;
+    renderCondaPythonVersionDetails();
+    setReady(`查询失败：Python ${major}（${channel}）。`);
   }
+}
 
-  state.condaFullVersionsLoading = false;
+// 强制刷新指定大版本的 Conda 版本缓存
+async function refreshCondaPythonVersions(version) {
+  const major = version || state.condaSelectedMajor;
+  if (!major) return;
+
+  const channel = getSelectedChannel();
+  state.condaFullVersionsLoading = true;
+  state.condaSelectedMajor = major;
+  state.condaChannel = channel;
+  renderCondaMajorVersions();
   renderCondaPythonVersionDetails();
-  setReady(`Python ${major}（${state.condaChannel}）小版本已加载。`);
+
+  try {
+    const params = new URLSearchParams({ version: major, channel });
+    const result = await request(`/api/conda/python-versions/refresh?${params}`, { method: "POST" });
+    const versions = result.versions || [];
+    showVersionsForMajor(major, channel, versions, false);
+    setReady(`Python ${major}（${channel}）已刷新。`);
+  } catch {
+    state.condaFullVersions = [];
+    state.condaFullVersionsLoading = false;
+    renderCondaPythonVersionDetails();
+    setReady(`刷新失败：Python ${major}（${channel}）。`);
+  }
+}
+
+// ---------- 创建表单版本下拉填充 ----------
+
+// 为创建表单的 Python 版本下拉填充小版本列表
+function populateCreateFormVersions(major, versions) {
+  const makeOptions = (select, keepLatest = true) => {
+    // 保留当前选中的值
+    const currentVal = select.value;
+    select.innerHTML = "";
+    if (keepLatest) {
+      const opt = document.createElement("option");
+      opt.value = "latest";
+      opt.textContent = "latest（使用默认）";
+      select.appendChild(opt);
+    }
+    if (versions && versions.length) {
+      // 只显示与当前大版本匹配的小版本
+      const prefix = `${major}.`;
+      const filtered = versions.filter((v) => v.startsWith(prefix));
+      const sorted = [...filtered].sort((a, b) =>
+        b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" })
+      );
+      for (const ver of sorted) {
+        const opt = document.createElement("option");
+        opt.value = ver;
+        opt.textContent = ver;
+        select.appendChild(opt);
+      }
+    }
+    // 恢复选中值（如果还在的话）
+    if ([...select.options].some((o) => o.value === currentVal)) {
+      select.value = currentVal;
+    }
+  };
+
+  makeOptions(elements.condaPythonVersionSelect);
+  makeOptions(elements.condaClonePythonVersionSelect);
+}
+
+// 从缓存加载指定通道的全部版本数据，并更新创建表单的下拉
+async function loadCreateFormVersions(channel) {
+  try {
+    const cacheResp = await request("/api/conda/python-versions/cache");
+    const versions = [];
+    const channelKey = channel || "defaults";
+    const channelData = cacheResp?.channels?.[channelKey] || {};
+    // 合并所有大版本的小版本（新结构：{ versions: [...], updatedAt }）
+    for (const [major, entry] of Object.entries(channelData)) {
+      if (entry?.versions) {
+        for (const v of entry.versions) {
+          versions.push(v);
+        }
+      }
+    }
+    versions.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
+    populateCreateFormVersions("", versions);
+  } catch {
+    // 缓存不可用时保持现状
+  }
+}
+
+// 创建表单切换通道时重新加载版本列表
+function setupCreateFormChannelListeners() {
+  const reload = () => {
+    const channelPython = elements.condaCreateChannelSelect.value;
+    const channelClone = elements.condaCloneChannelSelect.value;
+    // 哪个模式可见就刷新哪个
+    if (!elements.condaPythonFields.classList.contains("hidden")) {
+      loadCreateFormVersions(channelPython);
+    }
+    if (!elements.condaCloneFields.classList.contains("hidden")) {
+      loadCreateFormVersions(channelClone);
+    }
+  };
+
+  elements.condaCreateChannelSelect.addEventListener("change", reload);
+  elements.condaCloneChannelSelect.addEventListener("change", reload);
 }
 
 async function loadPythonVersions() {
@@ -796,6 +946,7 @@ async function createCondaEnvironment(event) {
 
   if (mode === "python") {
     payload.pythonVersion = data.get("pythonVersion");
+    payload.channel = elements.condaCreateChannelSelect.value;
     payload.packages = String(data.get("packages") || "")
       .split(/\r?\n/)
       .map((item) => item.trim())
@@ -806,6 +957,7 @@ async function createCondaEnvironment(event) {
     payload.clonePackages = form.elements.clonePackages.checked;
     payload.targetPythonVersion = data.get("targetPythonVersion");
     payload.explicitPackagesOnly = form.elements.explicitPackagesOnly.checked;
+    payload.channel = elements.condaCloneChannelSelect.value;
   }
 
   setBusy(`正在创建环境 ${payload.name}...`);
@@ -833,13 +985,15 @@ async function createCondaEnvironment(event) {
         ? [
             `创建方式: 按 Python 版本创建`,
             `Python 版本: ${payload.pythonVersion || "latest"}`,
+            `Conda 源: ${payload.channel || "defaults"}`,
             `额外包: ${payload.packages?.length ? payload.packages.join(", ") : "无"}`
           ]
         : [
             "创建方式: 基于已有环境创建",
             `源环境: ${payload.sourceName || "<未选择>"}`,
             `克隆 Python: ${payload.clonePython ? "是" : "否"}`,
-            `克隆包: ${payload.clonePackages ? "是" : "否"}`
+            `克隆包: ${payload.clonePackages ? "是" : "否"}`,
+            `Conda 源: ${payload.channel || "defaults"}`
           ]
   });
 
@@ -1487,7 +1641,7 @@ function wireCondaForm() {
 
   elements.refreshCondaPythonVersionsButton.addEventListener("click", async () => {
     try {
-      await loadCondaPythonVersions(state.condaSelectedMajor);
+      await refreshCondaPythonVersions(state.condaSelectedMajor);
     } catch (error) {
       setReady(error.message);
       alert(error.message);
@@ -1505,7 +1659,32 @@ function wireCondaForm() {
     });
   });
 
+  // 创建表单：刷新版本按钮
+  elements.refreshCondaCreateVersionsButton.addEventListener("click", async () => {
+    const mode = elements.condaModeSelect.value;
+    const channel = mode === "clone"
+      ? elements.condaCloneChannelSelect.value
+      : elements.condaCreateChannelSelect.value;
+    try {
+      // 刷新全部缓存（遍历大版本）
+      for (const major of CONDA_MAJOR_VERSIONS) {
+        const params = new URLSearchParams({ version: major, channel });
+        await request(`/api/conda/python-versions/refresh?${params}`, { method: "POST" });
+      }
+      await loadCreateFormVersions(channel);
+      setReady(`Conda 版本缓存（${channel}）已刷新。`);
+    } catch (error) {
+      setReady(error.message);
+      alert(error.message);
+    }
+  });
+
+  // 创建表单：通道切换时重新加载版本下拉
+  setupCreateFormChannelListeners();
+
   toggleMode();
+  // 初始加载创建表单的版本下拉
+  loadCreateFormVersions("defaults").catch(() => {});
   void fillCondaExportPath({ force: true });
   void fillCondaExportDirectory({ force: true });
 }

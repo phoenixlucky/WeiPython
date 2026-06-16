@@ -12,9 +12,11 @@ import {
   discoverPythonVersions,
   exportAllCondaEnvironmentsToDirectory,
   exportCondaEnvironmentToFile,
+  getCondaPythonVersionsCache,
   importCondaEnvironmentFromFile,
   listCondaEnvironments,
   listVirtualEnvironments,
+  refreshCondaPythonVersions,
   searchCondaPythonVersions
 } from "./services/environment-service.js";
 import {
@@ -122,6 +124,18 @@ async function handleApi(request, response, pathname, searchParams) {
       const version = searchParams.get("version") || "";
       const channel = searchParams.get("channel") || "";
       sendJson(response, 200, await searchCondaPythonVersions(version, channel, preferredCondaRoot));
+      return;
+    }
+
+    if (request.method === "GET" && pathname === "/api/conda/python-versions/cache") {
+      sendJson(response, 200, await getCondaPythonVersionsCache());
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/conda/python-versions/refresh") {
+      const version = searchParams.get("version") || "";
+      const channel = searchParams.get("channel") || "";
+      sendJson(response, 200, await refreshCondaPythonVersions(version, channel, preferredCondaRoot));
       return;
     }
 

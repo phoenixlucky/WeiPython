@@ -1,4 +1,42 @@
 # 更新日志
+## v2.6.3 - Conda 版本缓存独立计时 (2026-06-17)
+
+### 🔧 技术改进
+
+#### Conda 版本缓存各自独立计时
+- ✅ defaults 和 conda-forge 通道的缓存条目各自记录独立的时间戳
+- ✅ 刷新任一通道不再影响另一通道的缓存有效期
+- ✅ 底层缓存结构改为每通道+大版本对存储 { versions, updatedAt }
+
+## v2.6.2 - 新增 Conda 版本缓存与创建表单小版本选择 (2026-06-17)
+
+### 🚀 新增功能
+
+#### Conda Python 版本本地缓存
+- ✅ 自动缓存 `conda search` 结果到 `~/.weipython/cache/conda-python-versions.json`
+- ✅ 缓存有效期 1 小时，命中后直接返回，避免重复查询
+- ✅ 「Python 版本」页面优先展示缓存数据，标注「（缓存）」
+- ✅ 刷新按钮调用强制刷新端点，更新缓存
+
+#### 创建环境支持选择小版本与 Conda 源
+- ✅ 「按 Python 版本创建」的版本下拉改为动态加载缓存的完整小版本号
+- ✅ 「基于已有环境创建」的目标版本下拉同样从缓存加载
+- ✅ 两种模式均新增 Conda 源选择器（defaults / conda-forge）
+- ✅ 选择 conda-forge 源时自动追加 `-c conda-forge` 参数
+- ✅ 创建表单新增 ↻ 刷新按钮，一键刷新全部大版本缓存
+
+### 🔧 技术改进
+
+#### 后端
+- ✅ 新增 `getCondaPythonVersionsCache()` 返回完整缓存
+- ✅ 新增 `refreshCondaPythonVersions(version, channel, root)` 强制刷新
+- ✅ `searchCondaPythonVersions` 改为缓存优先策略
+- ✅ `createCondaEnvironment` 新增 channel 参数支持
+
+#### API
+- ✅ `GET /api/conda/python-versions/cache` — 获取缓存
+- ✅ `POST /api/conda/python-versions/refresh` — 强制刷新
+
 ## v2.6.1 - 新增 Conda Python 版本查询与 conda-forge 源支持 (2026-06-17)
 
 ### 🚀 新增功能

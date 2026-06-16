@@ -427,6 +427,12 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
     throw new Error("Conda not found");
   }
 
+  // 构建 -c 参数（非 defaults 通道时）
+  const channelArgs = [];
+  if (payload.channel && payload.channel !== "defaults") {
+    channelArgs.push("-c", payload.channel);
+  }
+
   if (payload.mode === "clone") {
     const clonePython = Boolean(payload.clonePython);
     const clonePackages = Boolean(payload.clonePackages);
@@ -442,6 +448,7 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
         payload.name,
         "--clone",
         payload.sourceName,
+        ...channelArgs,
         "-y"
       ], preferredRoot);
       if (!result.ok) {
@@ -465,6 +472,7 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
         "-n",
         payload.name,
         `python=${sourceEnv.pythonVersion}`,
+        ...channelArgs,
         "-y"
       ], preferredRoot);
       if (!result.ok) {
@@ -486,7 +494,7 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
 
     await fs.writeFile(tempFile, rewritten, "utf8");
     try {
-      const result = await runCondaCommand(["env", "create", "-f", tempFile], preferredRoot);
+      const result = await runCondaCommand(["env", "create", "-f", tempFile, ...channelArgs], preferredRoot);
       if (!result.ok) {
         throw new Error(formatCondaFailure(result.stderr, result.stdout));
       }
@@ -496,7 +504,7 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
     }
   }
 
-  const args = ["create", "-n", payload.name, `python=${resolveRequestedPythonVersion(payload.pythonVersion)}`];
+  const args = ["create", "-n", payload.name, `python=${resolveRequestedPythonVersion(payload.pythonVersion)}`, ...channelArgs];
   for (const pkg of payload.packages || []) {
     args.push(pkg);
   }
@@ -645,7 +653,46 @@ function parseCondaSearchVersionOutput(stdout) {
   }
 }
 
+// ---------- Conda Python 版本缓存 ----------
+const CACHE_DIR = path.join(os.homedir(), ".weipython", "cache");
+const CACHE_FILE = path.join(CACHE_DIR, "conda-python-versions.json");
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 小时
+
+async function ensureCacheDir() {
+  await fs.mkdir(CACHE_DIR, { recursive: true });
+}
+
+async function readVersionCache() {
+  try {
+    const content = await fs.readFile(CACHE_FILE, "utf8");
+    return JSON.parse(content);
+  } catch {
+    return {};
+  }
+}
+
+async function writeVersionCache(cache) {
+  await ensureCacheDir();
+  await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2), "utf8");
+}
+
+function isEntryFresh(entry) {
+  if (!entry || typeof entry !== "object") return false;
+  const age = Date.now() - (entry.updatedAt || 0);
+  return age < CACHE_TTL_MS;
+}
+
 export async function searchCondaPythonVersions(version, channel = "", preferredRoot = "") {
+  const channelKey = channel || "defaults";
+  const cache = await readVersionCache();
+  const entry = cache[channelKey]?.[version];
+
+  // 检查该通道+版本是否有独立缓存且在有效期内
+  if (entry && isEntryFresh(entry)) {
+    return { condaAvailable: true, versions: entry.versions || [], fromCache: true };
+  }
+
+  // 缓存缺失或过期 → 查询 conda
   const condaExecutable = await detectCondaExecutable(preferredRoot);
   if (!condaExecutable) {
     return { condaAvailable: false, versions: [] };
@@ -663,10 +710,55 @@ export async function searchCondaPythonVersions(version, channel = "", preferred
       return { condaAvailable: true, versions: [] };
     }
     const versions = parseCondaSearchVersionOutput(result.stdout);
+
+    // 更新该通道+版本的单独缓存条目
+    if (!cache[channelKey]) cache[channelKey] = {};
+    cache[channelKey][version] = { versions, updatedAt: Date.now() };
+    await writeVersionCache(cache);
+
+    return { condaAvailable: true, versions, fromCache: false };
+  } catch {
+    return { condaAvailable: true, versions: [] };
+  }
+}
+
+export async function refreshCondaPythonVersions(version, channel = "", preferredRoot = "") {
+  // 强制重新查询，绕过缓存
+  const condaExecutable = await detectCondaExecutable(preferredRoot);
+  if (!condaExecutable) {
+    return { condaAvailable: false, versions: [] };
+  }
+
+  const channelKey = channel || "defaults";
+  const args = ["search", `python=${version}`];
+  if (channel && channel !== "defaults") {
+    args.push("-c", channel);
+  }
+  args.push("--json");
+
+  try {
+    const result = await runCondaCommand(args, preferredRoot);
+    if (!result.ok) {
+      return { condaAvailable: true, versions: [] };
+    }
+    const versions = parseCondaSearchVersionOutput(result.stdout);
+
+    // 更新该通道+版本的缓存
+    const cache = await readVersionCache();
+    if (!cache[channelKey]) cache[channelKey] = {};
+    cache[channelKey][version] = { versions, updatedAt: Date.now() };
+    await writeVersionCache(cache);
+
     return { condaAvailable: true, versions };
   } catch {
     return { condaAvailable: true, versions: [] };
   }
+}
+
+export async function getCondaPythonVersionsCache() {
+  const cache = await readVersionCache();
+  // 新结构：{ defaults: { "3.14": { versions: [...], updatedAt } } }
+  return { channels: cache, updatedAt: Date.now() };
 }
 
 export async function discoverPythonVersions() {

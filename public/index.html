@@ -19,7 +19,7 @@
       <aside class="sidebar">
         <div class="sidebar-panel brand-block">
           <span class="brand-mark">WeiPython Manager</span>
-          <span class="version-chip">v2.6.1</span>
+          <span class="version-chip">v2.6.3</span>
           <p class="eyebrow">Engineering Console</p>
           <h1>尉Python 环境管理器</h1>
           <p class="brand-subtitle">Wei Python Environment Manager</p>
@@ -54,7 +54,7 @@
             <p class="hero-description">主任务前置，次要信息折叠。创建环境、导入导出 YAML、包维护与日志输出都集中在同一个工作台里。</p>
             <div class="hero-actions">
               <span>尉缭子科技</span>
-              <span>Release 2.6.1</span>
+              <span>Release 2.6.3</span>
             </div>
           </div>
           <div class="hero-meta">
@@ -131,24 +131,26 @@
                 </div>
 
                 <div id="condaPythonFields" class="stack-form">
-                  <div class="form-slab split-form">
+                  <div class="form-slab split-form" style="grid-template-columns:1fr 1fr auto">
                     <label>
                       <span>Python 版本</span>
-                      <select name="pythonVersion">
-                        <option value="latest" selected>latest</option>
-                        <option>3.14</option>
-                        <option>3.13</option>
-                        <option>3.12</option>
-                        <option>3.11</option>
-                        <option>3.10</option>
-                        <option>3.9</option>
+                      <select name="pythonVersion" id="condaPythonVersionSelect">
+                        <option value="latest" selected>latest（使用默认）</option>
                       </select>
                     </label>
                     <label>
-                      <span>额外包</span>
-                      <textarea name="packages" rows="5" placeholder="每行一个包，例如 numpy"></textarea>
+                      <span>Conda 源</span>
+                      <select name="channel" id="condaCreateChannelSelect">
+                        <option value="defaults">defaults</option>
+                        <option value="conda-forge">conda-forge</option>
+                      </select>
                     </label>
+                    <button class="ghost-button" type="button" id="refreshCondaCreateVersionsButton" style="align-self:flex-end" title="刷新版本列表">↻</button>
                   </div>
+                  <label>
+                    <span>额外包</span>
+                    <textarea name="packages" rows="5" placeholder="每行一个包，例如 numpy"></textarea>
+                  </label>
                 </div>
 
                 <div id="condaCloneFields" class="stack-form hidden">
@@ -159,14 +161,15 @@
                     </label>
                     <label>
                       <span>目标 Python 版本</span>
-                      <select name="targetPythonVersion">
-                        <option value="latest" selected>latest</option>
-                        <option>3.14</option>
-                        <option>3.13</option>
-                        <option>3.12</option>
-                        <option>3.11</option>
-                        <option>3.10</option>
-                        <option>3.9</option>
+                      <select name="targetPythonVersion" id="condaClonePythonVersionSelect">
+                        <option value="latest" selected>latest（使用默认）</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>Conda 源</span>
+                      <select name="channel" id="condaCloneChannelSelect">
+                        <option value="defaults">defaults</option>
+                        <option value="conda-forge">conda-forge</option>
                       </select>
                     </label>
                   </div>
