@@ -150,7 +150,9 @@ function buildApplicationMenu() {
         {
           label: `关于 ${APP_NAME}`,
           click: () => {
-            void showAboutDialog();
+            if (mainWindow) {
+              mainWindow.webContents.send("app:show-about");
+            }
           }
         }
       ]

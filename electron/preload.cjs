@@ -9,5 +9,8 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   },
   chooseCondaExportDirectory(defaultPath) {
     return ipcRenderer.invoke("dialog:choose-conda-export-directory", { defaultPath });
+  },
+  onShowAbout(callback) {
+    ipcRenderer.on("app:show-about", () => callback());
   }
 });

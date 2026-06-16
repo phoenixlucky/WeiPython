@@ -68,7 +68,7 @@ const elements = {
   condaCreateChannelSelect: document.querySelector("#condaCreateChannelSelect"),
   condaCloneChannelSelect: document.querySelector("#condaCloneChannelSelect"),
   refreshCondaCreateVersionsButton: document.querySelector("#refreshCondaCreateVersionsButton"),
-  aboutButton: document.querySelector("#aboutButton"),
+  navAboutButton: document.querySelector("#navAboutButton"),
   aboutModal: document.querySelector("#aboutModal"),
   aboutCloseButton: document.querySelector("#aboutCloseButton"),
   aboutPlatform: document.querySelector("#aboutPlatform"),
@@ -1481,7 +1481,13 @@ async function runPackageAction(action, payload = {}) {
 
 function wireNavigation() {
   document.querySelectorAll(".nav-item").forEach((button) => {
-    button.addEventListener("click", () => switchPanel(button.dataset.panel));
+    button.addEventListener("click", () => {
+      if (button.dataset.panel === "about") {
+        showAboutModal();
+      } else {
+        switchPanel(button.dataset.panel);
+      }
+    });
   });
 }
 
@@ -1814,16 +1820,23 @@ function wireListActions() {
   });
 }
 
+function showAboutModal() {
+  // 动态填充系统信息
+  if (state.overview) {
+    elements.aboutPlatform.textContent = `${state.overview.platform || "?"} / ${state.overview.arch || "?"}`;
+    elements.aboutNodeVersion.textContent = state.overview.systemNodeVersion || state.overview.nodeVersion || "-";
+    elements.aboutCondaState.textContent = state.overview.condaPath ? `已连接 (${state.overview.condaPath})` : "未检测到";
+  }
+  elements.aboutModal.classList.remove("hidden");
+}
+
 function wireAboutModal() {
-  elements.aboutButton.addEventListener("click", () => {
-    // 动态填充系统信息
-    if (state.overview) {
-      elements.aboutPlatform.textContent = `${state.overview.platform || "?"} / ${state.overview.arch || "?"}`;
-      elements.aboutNodeVersion.textContent = state.overview.systemNodeVersion || state.overview.nodeVersion || "-";
-      elements.aboutCondaState.textContent = state.overview.condaPath ? `已连接 (${state.overview.condaPath})` : "未检测到";
-    }
-    elements.aboutModal.classList.remove("hidden");
-  });
+  // 桌面版菜单栏「关于」触发的 IPC 监听
+  if (window.desktopAPI?.onShowAbout) {
+    window.desktopAPI.onShowAbout(() => {
+      showAboutModal();
+    });
+  }
 
   elements.aboutCloseButton.addEventListener("click", () => {
     elements.aboutModal.classList.add("hidden");
