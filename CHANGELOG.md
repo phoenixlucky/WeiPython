@@ -1,4 +1,42 @@
 # 更新日志
+## v2.6.6 - Conda 环境克隆增强与 pip 回退安装 (2026-06-16)
+
+### 🚀 新增功能
+
+#### Conda 环境创建支持 pip 回退
+- ✅ 当 conda 源无法解析部分包时，自动通过 pip 安装缺失包
+- ✅ 支持 conda-forge 源 (`--override-channels`) 下 conda → pip 回退链路
+- ✅ 新增 `explicitPackagesOnly` 模式，仅安装显式依赖，跳过克隆包
+- ✅ 添加 `ensurepip` 自动引导，确保目标环境有可用 pip
+
+#### Conda 环境导出自定义通道
+- ✅ `rewriteExportedEnvironment` 支持重写 YAML 中的 `channels:` 段
+- ✅ 创建克隆环境时，按源通道写入正确的 channel 配置
+
+### 🔧 技术改进
+
+#### Python 版本查询支持全量搜索
+- ✅ `searchCondaPythonVersions` 在未指定版本时直接查询 conda，不再走缓存
+- ✅ 全量搜索结果按大版本分组缓存，提升后续按版本查询效率
+
+#### Conda 命令行参数集中管理
+- ✅ 提取 `buildCondaSolveArgs`、`buildCondaSearchArgs`、`buildCondaEnvCreateArgs` 等构建函数
+- ✅ 统一 `--solver classic --no-default-packages` 参数，消除重复
+
+#### 创建环境表单体验优化
+- ✅ 指定大版本时只显示对应小版本；未指定时展示全部缓存版本
+- ✅ 缓存为空时 fallback 到已知大版本列表
+- ✅ 无缓存时自动在线查询，不再保持沉默
+- ✅ Conda 源切换时自动重新加载版本列表
+- ✅ 克隆包但不克隆 Python 时，日志中记录目标 Python 版本
+
+### 🐛 Bug 修复
+
+#### Conda 包名解析兼容性
+- ✅ `parseMissingCondaPackages` 正确解析 `PackagesNotFoundError` 块中的包名
+- ✅ `condaSpecToPipSpec` 支持 conda 精确匹配 (`pkg=ver`) 和构建号匹配 (`pkg=ver=build`) 两种格式
+- ✅ pip 回退时自动排除 `pip`、`setuptools`、`wheel` 等引导包
+
 ## v2.6.5 - 修复切换 Conda 源时版本下拉消失 (2026-06-17)
 
 ### 🐛 Bug 修复

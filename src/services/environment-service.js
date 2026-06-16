@@ -33,6 +33,64 @@ function resolveRequestedPythonVersion(version) {
   return version;
 }
 
+function toMajorMinorPythonVersion(version) {
+  const value = String(version || "").trim();
+  const match = value.match(/^(\d+\.\d+)/);
+  return match?.[1] || "";
+}
+
+function resolveFlexiblePythonVersion(version) {
+  return toMajorMinorPythonVersion(resolveRequestedPythonVersion(version));
+}
+
+function parseMissingCondaPackages(output = "") {
+  const missing = [];
+  let inMissingBlock = false;
+
+  for (const rawLine of String(output).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (line.startsWith("PackagesNotFoundError:")) {
+      inMissingBlock = true;
+      continue;
+    }
+    if (!inMissingBlock) {
+      continue;
+    }
+    const match = line.match(/^-\s+(.+)$/);
+    if (match) {
+      missing.push(match[1].trim());
+    } else if (missing.length && line && !line.startsWith("-")) {
+      break;
+    }
+  }
+
+  return missing;
+}
+
+function condaSpecToPipSpec(spec) {
+  const value = String(spec || "").trim();
+  const exactMatch = value.match(/^([A-Za-z0-9_.-]+)=([^=<>!~]+)$/);
+  if (exactMatch) {
+    return `${exactMatch[1]}==${exactMatch[2]}`;
+  }
+
+  const buildMatch = value.match(/^([A-Za-z0-9_.-]+)=([^=<>!~]+)=.+$/);
+  if (buildMatch) {
+    return `${buildMatch[1]}==${buildMatch[2]}`;
+  }
+
+  return value;
+}
+
+function getCondaSpecName(spec) {
+  const value = String(spec || "").trim();
+  return value.match(/^([A-Za-z0-9_.-]+)/)?.[1]?.toLowerCase() || "";
+}
+
+function isPythonBootstrapPackage(spec) {
+  return ["pip", "setuptools", "wheel"].includes(getCondaSpecName(spec));
+}
+
 function formatCondaFailure(stderr = "", stdout = "") {
   const combined = `${stderr}\n${stdout}`.trim();
   const normalized = combined.replace(/\r/g, "");
@@ -330,17 +388,58 @@ export async function listCondaEnvironments(preferredRoot = "") {
   };
 }
 
-function rewriteExportedEnvironment(content, targetName, pythonVersion) {
+function buildEnvironmentChannels(channel) {
+  if (!channel) {
+    return null;
+  }
+  return channel === "defaults" ? ["defaults"] : [channel, "nodefaults"];
+}
+
+function buildCondaChannelArgs(channel) {
+  return channel && channel !== "defaults" ? ["-c", channel, "--override-channels"] : [];
+}
+
+function buildCondaSearchArgs(channel) {
+  return [...buildCondaChannelArgs(channel), "--repodata-fn", "current_repodata.json"];
+}
+
+function buildCondaSolveArgs(channel) {
+  return [...buildCondaSearchArgs(channel), "--solver", "classic", "--no-default-packages"];
+}
+
+function buildCondaEnvCreateArgs() {
+  return ["--solver", "classic", "--no-default-packages"];
+}
+
+function rewriteExportedEnvironment(content, targetName, pythonVersion, channel) {
   const lines = content.split(/\r?\n/);
   const rewritten = [];
   let dependencyIndex = -1;
   let hasPython = false;
+  let channelsIndex = -1;
+  const requestedChannels = buildEnvironmentChannels(channel);
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const trimmed = line.trim();
 
     if (trimmed.startsWith("name:")) {
       rewritten.push(`name: ${targetName}`);
+      continue;
+    }
+
+    if (requestedChannels && trimmed === "channels:") {
+      channelsIndex = rewritten.length;
+      rewritten.push("channels:");
+      for (const entry of requestedChannels) {
+        rewritten.push(`  - ${entry}`);
+      }
+
+      i++;
+      while (i < lines.length && /^\s*-\s+/.test(lines[i])) {
+        i++;
+      }
+      i--;
       continue;
     }
 
@@ -354,7 +453,7 @@ function rewriteExportedEnvironment(content, targetName, pythonVersion) {
       continue;
     }
 
-    if (pythonVersion && trimmed.startsWith("- python=")) {
+    if (pythonVersion && /^\s*-\s*python(?:\s*$|[=<>!~])/.test(trimmed)) {
       const indent = line.slice(0, line.length - line.trimStart().length);
       rewritten.push(`${indent}- python=${pythonVersion}`);
       hasPython = true;
@@ -374,7 +473,144 @@ function rewriteExportedEnvironment(content, targetName, pythonVersion) {
     }
   }
 
+  if (requestedChannels && channelsIndex === -1) {
+    const channelLines = ["channels:", ...requestedChannels.map((entry) => `  - ${entry}`)];
+    const insertIndex = rewritten.findIndex((line) => line.trim() === "dependencies:");
+    if (insertIndex === -1) {
+      rewritten.push(...channelLines);
+    } else {
+      rewritten.splice(insertIndex, 0, ...channelLines);
+    }
+  }
+
   return `${rewritten.join("\n").trim()}\n`;
+}
+
+function parseExportedCondaSpecs(exportedYaml) {
+  const condaSpecs = [];
+  const pipSpecs = [];
+  const lines = String(exportedYaml || "").split(/\r?\n/);
+  let inDependencies = false;
+  let inPip = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed === "dependencies:") {
+      inDependencies = true;
+      inPip = false;
+      continue;
+    }
+    if (!inDependencies) {
+      continue;
+    }
+    if (!line.startsWith(" ")) {
+      inDependencies = false;
+      inPip = false;
+      continue;
+    }
+
+    const topLevelMatch = line.match(/^\s{2}-\s+(.+)$/);
+    if (topLevelMatch) {
+      const spec = topLevelMatch[1].trim();
+      if (spec === "pip:") {
+        inPip = true;
+      } else {
+        inPip = false;
+        condaSpecs.push(spec);
+      }
+      continue;
+    }
+
+    const pipMatch = inPip ? line.match(/^\s{4}-\s+(.+)$/) : null;
+    if (pipMatch) {
+      pipSpecs.push(pipMatch[1].trim());
+    }
+  }
+
+  return {
+    condaSpecs,
+    pipSpecs
+  };
+}
+
+async function installPackagesWithPipFallback(envName, condaSpecs, pipSpecs, solveArgs, preferredRoot) {
+  const requestedCondaSpecs = condaSpecs.filter(
+    (spec) => !/^python(?:\s*$|[=<>!~])/i.test(spec) && !isPythonBootstrapPackage(spec)
+  );
+  const pipFallbackSpecs = pipSpecs.filter((spec) => !isPythonBootstrapPackage(spec));
+
+  if (requestedCondaSpecs.length) {
+    const installResult = await runCondaCommand(["install", ...solveArgs, "-n", envName, ...requestedCondaSpecs, "-y"], preferredRoot);
+    if (!installResult.ok) {
+      const missing = parseMissingCondaPackages(`${installResult.stderr || ""}\n${installResult.stdout || ""}`);
+      const missingSet = new Set(missing.map((item) => item.toLowerCase()));
+      const retrySpecs = missing.length
+        ? requestedCondaSpecs.filter((spec) => !missingSet.has(spec.toLowerCase()))
+        : requestedCondaSpecs;
+      pipFallbackSpecs.push(...missing.filter((spec) => !isPythonBootstrapPackage(spec)).map(condaSpecToPipSpec));
+
+      for (const spec of retrySpecs) {
+        const retryResult = await runCondaCommand(["install", ...solveArgs, "-n", envName, spec, "-y"], preferredRoot);
+        if (!retryResult.ok) {
+          if (!isPythonBootstrapPackage(spec)) {
+            pipFallbackSpecs.push(condaSpecToPipSpec(spec));
+          }
+        }
+      }
+    }
+  }
+
+  const uniquePipFallbackSpecs = [...new Set(pipFallbackSpecs.filter((spec) => spec && !isPythonBootstrapPackage(spec)))];
+  if (uniquePipFallbackSpecs.length) {
+    const { environments } = await listCondaEnvironments(preferredRoot);
+    const env = environments.find((entry) => entry.name === envName);
+    const pythonExecutable = env?.path ? getCondaPythonExecutable(env.path) : null;
+    if (!pythonExecutable || !(await pathExists(pythonExecutable))) {
+      throw new Error(`Conda 环境 '${envName}' 已创建，但找不到 Python，无法安装 pip 包`);
+    }
+
+    await ensurePipAvailable(pythonExecutable);
+    const pipResult = await runCommand(pythonExecutable, ["-m", "pip", "install", ...uniquePipFallbackSpecs]);
+    if (!pipResult.ok) {
+      throw new Error(formatCondaFailure(pipResult.stderr, pipResult.stdout));
+    }
+  }
+}
+
+async function ensurePipAvailable(pythonExecutable) {
+  const pipCheck = await runCommand(pythonExecutable, ["-m", "pip", "--version"]);
+  if (pipCheck.ok) {
+    return;
+  }
+
+  const ensurePip = await runCommand(pythonExecutable, ["-m", "ensurepip", "--upgrade"]);
+  if (!ensurePip.ok) {
+    throw new Error([
+      "需要用 pip 安装 conda-forge 无法解析的包，但目标环境中没有可用 pip。",
+      "Conda 源当前也无法安装 pip。",
+      "",
+      "原始错误摘要:",
+      formatCondaFailure(ensurePip.stderr, ensurePip.stdout)
+    ].join("\n"));
+  }
+}
+
+async function createCondaEnvironmentFromExplicitSpecs(payload, exportedYaml, pythonVersion, solveArgs, preferredRoot) {
+  const specs = parseExportedCondaSpecs(exportedYaml);
+  const createResult = await runCondaCommand([
+    "create",
+    ...solveArgs,
+    "-n",
+    payload.name,
+    `python=${pythonVersion}`,
+    "-y"
+  ], preferredRoot);
+  if (!createResult.ok) {
+    throw new Error(formatCondaFailure(createResult.stderr, createResult.stdout));
+  }
+
+  await installPackagesWithPipFallback(payload.name, specs.condaSpecs, specs.pipSpecs, solveArgs, preferredRoot);
+  return { message: `环境 '${payload.name}' 创建成功` };
 }
 
 async function ensureParentDirectory(targetPath) {
@@ -427,11 +663,7 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
     throw new Error("Conda not found");
   }
 
-  // 构建 -c 参数（非 defaults 通道时）
-  const channelArgs = [];
-  if (payload.channel && payload.channel !== "defaults") {
-    channelArgs.push("-c", payload.channel);
-  }
+  const solveArgs = buildCondaSolveArgs(payload.channel);
 
   if (payload.mode === "clone") {
     const clonePython = Boolean(payload.clonePython);
@@ -444,11 +676,11 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
     if (clonePython && clonePackages) {
       const result = await runCondaCommand([
         "create",
+        ...solveArgs,
         "-n",
         payload.name,
         "--clone",
         payload.sourceName,
-        ...channelArgs,
         "-y"
       ], preferredRoot);
       if (!result.ok) {
@@ -469,10 +701,10 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
       }
       const result = await runCondaCommand([
         "create",
+        ...solveArgs,
         "-n",
         payload.name,
         `python=${sourceEnv.pythonVersion}`,
-        ...channelArgs,
         "-y"
       ], preferredRoot);
       if (!result.ok) {
@@ -488,13 +720,20 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
       throw new Error(formatCondaFailure(exported.stderr, exported.stdout));
     }
 
-    const targetPythonVersion = resolveRequestedPythonVersion(payload.targetPythonVersion) || sourceEnv.pythonVersion || "3.11";
-    const rewritten = rewriteExportedEnvironment(exported.stdout, payload.name, targetPythonVersion);
+    const targetPythonVersion = payload.targetPythonVersion
+      ? resolveFlexiblePythonVersion(payload.targetPythonVersion)
+      : toMajorMinorPythonVersion(sourceEnv.pythonVersion) || "3.11";
+
+    if (payload.explicitPackagesOnly) {
+      return createCondaEnvironmentFromExplicitSpecs(payload, exported.stdout, targetPythonVersion, solveArgs, preferredRoot);
+    }
+
+    const rewritten = rewriteExportedEnvironment(exported.stdout, payload.name, targetPythonVersion, payload.channel);
     const tempFile = path.join(os.tmpdir(), `pythonbb-${Date.now()}-${payload.name}.yml`);
 
     await fs.writeFile(tempFile, rewritten, "utf8");
     try {
-      const result = await runCondaCommand(["env", "create", "-f", tempFile, ...channelArgs], preferredRoot);
+      const result = await runCondaCommand(["env", "create", ...buildCondaEnvCreateArgs(), "-f", tempFile], preferredRoot);
       if (!result.ok) {
         throw new Error(formatCondaFailure(result.stderr, result.stdout));
       }
@@ -504,7 +743,7 @@ export async function createCondaEnvironment(payload, preferredRoot = "") {
     }
   }
 
-  const args = ["create", "-n", payload.name, `python=${resolveRequestedPythonVersion(payload.pythonVersion)}`, ...channelArgs];
+  const args = ["create", ...solveArgs, "-n", payload.name, `python=${resolveRequestedPythonVersion(payload.pythonVersion)}`];
   for (const pkg of payload.packages || []) {
     args.push(pkg);
   }
@@ -633,7 +872,7 @@ export async function importCondaEnvironmentFromFile(payload, preferredRoot = ""
 
   await fs.writeFile(tempFile, rewritten, "utf8");
   try {
-    const result = await runCondaCommand(["env", "create", "-f", tempFile], preferredRoot);
+    const result = await runCondaCommand(["env", "create", ...buildCondaEnvCreateArgs(), "-f", tempFile], preferredRoot);
     if (!result.ok) {
       throw new Error(formatCondaFailure(result.stderr, result.stdout));
     }
@@ -696,12 +935,16 @@ function isEntryFresh(entry) {
 
 export async function searchCondaPythonVersions(version, channel = "", preferredRoot = "") {
   const channelKey = channel || "defaults";
-  const cache = await readVersionCache();
-  const entry = cache[channelKey]?.[version];
 
-  // 检查该通道+版本是否有独立缓存且在有效期内
-  if (entry && isEntryFresh(entry)) {
-    return { condaAvailable: true, versions: entry.versions || [], fromCache: true };
+  // 未指定版本时（version 为空），不从缓存读取，直接查询 conda
+  if (version) {
+    const cache = await readVersionCache();
+    const entry = cache[channelKey]?.[version];
+
+    // 检查该通道+版本是否有独立缓存且在有效期内
+    if (entry && isEntryFresh(entry)) {
+      return { condaAvailable: true, versions: entry.versions || [], fromCache: true };
+    }
   }
 
   // 缓存缺失或过期 → 查询 conda
@@ -710,11 +953,10 @@ export async function searchCondaPythonVersions(version, channel = "", preferred
     return { condaAvailable: false, versions: [] };
   }
 
-  const args = ["search", `python=${version}`];
-  if (channel && channel !== "defaults") {
-    args.push("-c", channel);
-  }
-  args.push("--json");
+  const channelPrefix = buildCondaSearchArgs(channel);
+  // version 为空时查询全部：conda search python --json
+  const searchArg = version ? `python=${version}` : "python";
+  const args = ["search", ...channelPrefix, searchArg, "--json"];
 
   try {
     const result = await runCondaCommand(args, preferredRoot);
@@ -724,9 +966,30 @@ export async function searchCondaPythonVersions(version, channel = "", preferred
     const versions = parseCondaSearchVersionOutput(result.stdout);
 
     // 更新该通道+版本的单独缓存条目
-    if (!cache[channelKey]) cache[channelKey] = {};
-    cache[channelKey][version] = { versions, updatedAt: Date.now() };
-    await writeVersionCache(cache);
+    if (version) {
+      const cache = await readVersionCache();
+      if (!cache[channelKey]) cache[channelKey] = {};
+      cache[channelKey][version] = { versions, updatedAt: Date.now() };
+      await writeVersionCache(cache);
+    } else {
+      // 查询全部版本 → 按大版本分别缓存
+      const cache = await readVersionCache();
+      if (!cache[channelKey]) cache[channelKey] = {};
+      const grouped = {};
+      for (const ver of versions) {
+        const mm = ver.match(/^(\d+\.\d+)/);
+        if (mm) {
+          if (!grouped[mm[1]]) grouped[mm[1]] = [];
+          grouped[mm[1]].push(ver);
+        }
+      }
+      for (const [majorVer, verList] of Object.entries(grouped)) {
+        cache[channelKey][majorVer] = { versions: [...new Set(verList)].sort((a, b) =>
+          b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" })
+        ), updatedAt: Date.now() };
+      }
+      await writeVersionCache(cache);
+    }
 
     return { condaAvailable: true, versions, fromCache: false };
   } catch {
@@ -742,11 +1005,9 @@ export async function refreshCondaPythonVersions(version, channel = "", preferre
   }
 
   const channelKey = channel || "defaults";
-  const args = ["search", `python=${version}`];
-  if (channel && channel !== "defaults") {
-    args.push("-c", channel);
-  }
-  args.push("--json");
+  const channelPrefix = buildCondaSearchArgs(channel);
+  const searchArg = version ? `python=${version}` : "python";
+  const args = ["search", ...channelPrefix, searchArg, "--json"];
 
   try {
     const result = await runCondaCommand(args, preferredRoot);
@@ -755,10 +1016,28 @@ export async function refreshCondaPythonVersions(version, channel = "", preferre
     }
     const versions = parseCondaSearchVersionOutput(result.stdout);
 
-    // 更新该通道+版本的缓存
+    // 更新缓存
     const cache = await readVersionCache();
     if (!cache[channelKey]) cache[channelKey] = {};
-    cache[channelKey][version] = { versions, updatedAt: Date.now() };
+
+    if (version) {
+      cache[channelKey][version] = { versions, updatedAt: Date.now() };
+    } else {
+      // 刷新全部版本 → 按大版本分别缓存
+      const grouped = {};
+      for (const ver of versions) {
+        const mm = ver.match(/^(\d+\.\d+)/);
+        if (mm) {
+          if (!grouped[mm[1]]) grouped[mm[1]] = [];
+          grouped[mm[1]].push(ver);
+        }
+      }
+      for (const [majorVer, verList] of Object.entries(grouped)) {
+        cache[channelKey][majorVer] = { versions: [...new Set(verList)].sort((a, b) =>
+          b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" })
+        ), updatedAt: Date.now() };
+      }
+    }
     await writeVersionCache(cache);
 
     return { condaAvailable: true, versions };

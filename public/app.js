@@ -808,13 +808,21 @@ function populateCreateFormVersions(major, versions) {
       select.appendChild(opt);
     }
     if (versions && versions.length) {
-      // 只显示与当前大版本匹配的小版本
-      const prefix = `${major}.`;
-      const filtered = versions.filter((v) => v.startsWith(prefix));
+      // 指定大版本时只显示对应小版本；创建表单按通道加载时 major 为空，直接展示全部缓存版本。
+      const prefix = major ? `${major}.` : "";
+      const filtered = prefix ? versions.filter((v) => v.startsWith(prefix)) : versions;
       const sorted = [...filtered].sort((a, b) =>
         b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" })
       );
       for (const ver of sorted) {
+        const opt = document.createElement("option");
+        opt.value = ver;
+        opt.textContent = ver;
+        select.appendChild(opt);
+      }
+    } else {
+      // 缓存为空 → fallback 到已知大版本
+      for (const ver of CONDA_MAJOR_VERSIONS) {
         const opt = document.createElement("option");
         opt.value = ver;
         opt.textContent = ver;
@@ -846,10 +854,24 @@ async function loadCreateFormVersions(channel) {
         }
       }
     }
-    // 该通道无缓存数据时，不清空已有下拉选项
-    if (!versions.length) return;
-    versions.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
-    populateCreateFormVersions("", versions);
+
+    if (versions.length) {
+      // 有缓存 → 直接用缓存数据填充
+      versions.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
+      populateCreateFormVersions("", versions);
+      return;
+    }
+
+    // 无缓存 → 直接在线查询该通道的全部版本，后端会缓存结果
+    const params = new URLSearchParams({ channel: channelKey });
+    const result = await request(`/api/conda/python-versions?${params}`);
+    const liveVersions = result.versions || [];
+    if (liveVersions.length) {
+      populateCreateFormVersions("", liveVersions);
+    } else {
+      // 在线查询也失败 → fallback 到已知大版本
+      populateCreateFormVersions("", []);
+    }
   } catch {
     // 缓存不可用时保持现状
   }
@@ -1001,6 +1023,7 @@ async function createCondaEnvironment(event) {
             `源环境: ${payload.sourceName || "<未选择>"}`,
             `克隆 Python: ${payload.clonePython ? "是" : "否"}`,
             `克隆包: ${payload.clonePackages ? "是" : "否"}`,
+            ...(!payload.clonePython && payload.clonePackages ? [`目标 Python 版本: ${payload.targetPythonVersion || "latest"}`] : []),
             `Conda 源: ${payload.channel || "defaults"}`
           ]
   });
@@ -1670,6 +1693,15 @@ function wireCondaForm() {
     loadCondaPythonVersions(major).catch((error) => {
       setReady(error.message);
       alert(error.message);
+    });
+  });
+
+  // Conda 源切换时：重新查询当前选中的大版本
+  elements.condaChannelRadios.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      if (state.condaSelectedMajor) {
+        loadCondaPythonVersions(state.condaSelectedMajor).catch(() => {});
+      }
     });
   });
 
