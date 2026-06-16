@@ -627,6 +627,48 @@ export async function importCondaEnvironmentFromFile(payload, preferredRoot = ""
   };
 }
 
+function parseCondaSearchVersionOutput(stdout) {
+  // conda search python=3.14 --json  →  { "python": [{ version:"3.14.0a5" }, ...] }
+  try {
+    const data = JSON.parse(stdout);
+    const entries = data.python || [];
+    const versionSet = new Set();
+    for (const entry of entries) {
+      const ver = entry.version;
+      if (ver) versionSet.add(ver);
+    }
+    return [...versionSet].sort((a, b) =>
+      b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" })
+    );
+  } catch {
+    return [];
+  }
+}
+
+export async function searchCondaPythonVersions(version, channel = "", preferredRoot = "") {
+  const condaExecutable = await detectCondaExecutable(preferredRoot);
+  if (!condaExecutable) {
+    return { condaAvailable: false, versions: [] };
+  }
+
+  const args = ["search", `python=${version}`];
+  if (channel && channel !== "defaults") {
+    args.push("-c", channel);
+  }
+  args.push("--json");
+
+  try {
+    const result = await runCondaCommand(args, preferredRoot);
+    if (!result.ok) {
+      return { condaAvailable: true, versions: [] };
+    }
+    const versions = parseCondaSearchVersionOutput(result.stdout);
+    return { condaAvailable: true, versions };
+  } catch {
+    return { condaAvailable: true, versions: [] };
+  }
+}
+
 export async function discoverPythonVersions() {
   const home = os.homedir();
   const candidates = [];

@@ -1,4 +1,27 @@
 # 更新日志
+## v2.6.1 - 新增 Conda Python 版本查询与 conda-forge 源支持 (2026-06-17)
+
+### 🚀 新增功能
+
+#### Conda 可用 Python 版本查询
+- ✅ 新增独立的「Python 版本」页面，在左侧导航栏「Conda」和「虚拟环境」之间
+- ✅ 无需一次查完：先展示已知大版本芯片（3.14 ~ 3.9），点击后再按需查询
+- ✅ 显示完整小版本/构建号（如 `3.14.0b1`、`3.14.0a5`），而非仅主版本号
+
+#### conda-forge 源支持
+- ✅ 版本查询页面新增 `defaults` / `conda-forge` 源切换
+- ✅ 切换到 conda-forge 后自动追加 `-c conda-forge` 参数执行查询
+- ✅ 详情卡片标题同步显示当前源名称
+
+### 🔧 技术改进
+
+#### 后端
+- ✅ `searchCondaPythonVersions(version, channel, root)` 新增 channel 参数
+- ✅ `GET /api/conda/python-versions` 新增 `?version=` 和 `?channel=` 查询参数
+
+#### 前端
+- ✅ 版本查询改为两步交互：选大版本 → 查小版本，启动时零远程请求
+
 ## v2.6.0 - 豆蔻少女版 UI 改版 (2026-05-30)
 
 - 完整界面重构为豆蔻少女版主题（樱粉奶油风、玻璃拟态、花瓣粒子）

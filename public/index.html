@@ -19,7 +19,7 @@
       <aside class="sidebar">
         <div class="sidebar-panel brand-block">
           <span class="brand-mark">WeiPython Manager</span>
-          <span class="version-chip">v2.6.0</span>
+          <span class="version-chip">v2.6.1</span>
           <p class="eyebrow">Engineering Console</p>
           <h1>尉Python 环境管理器</h1>
           <p class="brand-subtitle">Wei Python Environment Manager</p>
@@ -31,6 +31,7 @@
           <nav class="nav-list">
             <button class="nav-item active" data-panel="overview">概览</button>
             <button class="nav-item" data-panel="conda">Conda</button>
+            <button class="nav-item" data-panel="conda-python">Python 版本</button>
             <button class="nav-item" data-panel="venv">虚拟环境</button>
             <button class="nav-item" data-panel="packages">包管理</button>
           </nav>
@@ -53,7 +54,7 @@
             <p class="hero-description">主任务前置，次要信息折叠。创建环境、导入导出 YAML、包维护与日志输出都集中在同一个工作台里。</p>
             <div class="hero-actions">
               <span>尉缭子科技</span>
-              <span>Release 2.6.0</span>
+              <span>Release 2.6.1</span>
             </div>
           </div>
           <div class="hero-meta">
@@ -285,7 +286,47 @@
                 </summary>
                 <div id="condaList" class="collapse-body conda-bookmark-list"></div>
               </details>
+
             </div>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-conda-python">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Conda Python</p>
+              <h3>Conda 可用的 Python 版本</h3>
+            </div>
+            <button class="ghost-button" id="refreshCondaPythonVersionsButton">刷新</button>
+          </div>
+
+          <div class="workspace-grid">
+            <article class="surface-card">
+              <div class="section-head">
+                <h4>选择大版本</h4>
+                <span>点击查询对应的小版本</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;margin:0 0 12px">
+                <span style="font-size:12px;color:var(--muted)">源：</span>
+                <label class="check-line framed-check" style="margin:0">
+                  <input type="radio" name="condaChannel" value="defaults" checked />
+                  <span>defaults</span>
+                </label>
+                <label class="check-line framed-check" style="margin:0">
+                  <input type="radio" name="condaChannel" value="conda-forge" />
+                  <span>conda-forge</span>
+                </label>
+              </div>
+              <div id="condaMajorVersionsList" style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 0"></div>
+            </article>
+
+            <article class="surface-card" id="condaVersionDetailCard" style="display:none">
+              <div class="section-head">
+                <h4 id="condaVersionDetailTitle">版本详情</h4>
+                <span id="condaPythonVersionsMeta"></span>
+              </div>
+              <div id="condaPythonVersionsList" class="list-stack compact-list"></div>
+            </article>
           </div>
         </section>
 

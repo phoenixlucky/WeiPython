@@ -4,6 +4,10 @@ const state = {
   venvs: [],
   pythonVersionsLoaded: false,
   condaLoading: false,
+  condaSelectedMajor: null,
+  condaFullVersions: [],
+  condaFullVersionsLoading: false,
+  condaChannel: "defaults",
   installedPackages: []
 };
 
@@ -51,7 +55,14 @@ const elements = {
   operationCloseButton: document.querySelector("#operationCloseButton"),
   refreshInstalledPackagesButton: document.querySelector("#refreshInstalledPackagesButton"),
   upgradeNodeButton: document.querySelector("#upgradeNodeButton"),
-  upgradeAllPackagesButton: document.querySelector("#upgradeAllPackagesButton")
+  upgradeAllPackagesButton: document.querySelector("#upgradeAllPackagesButton"),
+  condaMajorVersionsList: document.querySelector("#condaMajorVersionsList"),
+  condaVersionDetailCard: document.querySelector("#condaVersionDetailCard"),
+  condaVersionDetailTitle: document.querySelector("#condaVersionDetailTitle"),
+  condaPythonVersionsList: document.querySelector("#condaPythonVersionsList"),
+  condaPythonVersionsMeta: document.querySelector("#condaPythonVersionsMeta"),
+  refreshCondaPythonVersionsButton: document.querySelector("#refreshCondaPythonVersionsButton"),
+  condaChannelRadios: document.querySelectorAll("input[name='condaChannel']")
 };
 
 let confirmResolver = null;
@@ -622,6 +633,86 @@ async function loadCondaEnvironments(options = {}) {
   if (!options.silent) {
     setReady("Conda 环境已刷新。");
   }
+}
+
+// 已知的 Conda 大版本列表（与后端 SUPPORTED_PYTHON_VERSIONS 保持一致）
+const CONDA_MAJOR_VERSIONS = ["3.14", "3.13", "3.12", "3.11", "3.10", "3.9"];
+
+function renderCondaMajorVersions() {
+  const { condaSelectedMajor } = state;
+
+  elements.condaMajorVersionsList.innerHTML = CONDA_MAJOR_VERSIONS
+    .map(
+      (ver) =>
+        `<button class="version-chip${condaSelectedMajor === ver ? " active" : ""}" data-major="${ver}">Python ${ver}</button>`
+    )
+    .join("");
+}
+
+function renderCondaPythonVersionDetails() {
+  const { condaSelectedMajor, condaFullVersions, condaFullVersionsLoading, condaChannel } = state;
+
+  if (!condaSelectedMajor) {
+    elements.condaVersionDetailCard.style.display = "none";
+    return;
+  }
+
+  elements.condaVersionDetailCard.style.display = "";
+  const channelLabel = condaChannel || "defaults";
+  elements.condaVersionDetailTitle.textContent = `Python ${condaSelectedMajor} (${channelLabel})`;
+  elements.condaPythonVersionsMeta.textContent = condaFullVersionsLoading
+    ? "查询中..."
+    : `${condaFullVersions.length} 个构建`;
+
+  if (condaFullVersionsLoading) {
+    elements.condaPythonVersionsList.innerHTML = '<article class="list-item"><strong>正在查询...</strong></article>';
+    return;
+  }
+
+  if (!condaFullVersions.length) {
+    elements.condaPythonVersionsList.innerHTML = '<article class="list-item"><strong>未查询到可用版本</strong><span class="list-meta">请确认 Conda 连接正常</span></article>';
+    return;
+  }
+
+  elements.condaPythonVersionsList.innerHTML = condaFullVersions
+    .map(
+      (ver) => `
+        <article class="list-item" style="display:inline-flex;width:auto;padding:6px 14px">
+          <span class="conda-bookmark-meta" style="font-size:12px;min-height:auto">${escapeHtml(ver)}</span>
+        </article>
+      `
+    )
+    .join("");
+}
+
+function getSelectedChannel() {
+  for (const radio of elements.condaChannelRadios) {
+    if (radio.checked) return radio.value;
+  }
+  return "defaults";
+}
+
+async function loadCondaPythonVersions(version) {
+  const major = version || state.condaSelectedMajor;
+  if (!major) return;
+
+  state.condaSelectedMajor = major;
+  state.condaChannel = getSelectedChannel();
+  state.condaFullVersionsLoading = true;
+  renderCondaMajorVersions();
+  renderCondaPythonVersionDetails();
+
+  try {
+    const params = new URLSearchParams({ version: major, channel: state.condaChannel });
+    const result = await request(`/api/conda/python-versions?${params}`);
+    state.condaFullVersions = result.versions || [];
+  } catch {
+    state.condaFullVersions = [];
+  }
+
+  state.condaFullVersionsLoading = false;
+  renderCondaPythonVersionDetails();
+  setReady(`Python ${major}（${state.condaChannel}）小版本已加载。`);
 }
 
 async function loadPythonVersions() {
@@ -1394,6 +1485,26 @@ function wireCondaForm() {
     }
   });
 
+  elements.refreshCondaPythonVersionsButton.addEventListener("click", async () => {
+    try {
+      await loadCondaPythonVersions(state.condaSelectedMajor);
+    } catch (error) {
+      setReady(error.message);
+      alert(error.message);
+    }
+  });
+
+  // 大版本点击：查询对应的小版本
+  elements.condaMajorVersionsList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-major]");
+    if (!button) return;
+    const major = button.dataset.major;
+    loadCondaPythonVersions(major).catch((error) => {
+      setReady(error.message);
+      alert(error.message);
+    });
+  });
+
   toggleMode();
   void fillCondaExportPath({ force: true });
   void fillCondaExportDirectory({ force: true });
@@ -1547,6 +1658,8 @@ async function bootstrap() {
     state.pythonVersionsLoaded = true;
     // 后台刷新 Conda 环境（loadOverview 可能超时，此调用兜底）
     loadCondaEnvironments({ silent: true }).catch(() => {});
+    // 渲染 Conda 大版本选择列表（无需远程查询）
+    renderCondaMajorVersions();
     loadVenvs({ silent: true }).catch((error) => setReady(`虚拟环境扫描失败: ${error.message}`));
   } catch (error) {
     setReady(error.message);

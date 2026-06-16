@@ -14,7 +14,8 @@ import {
   exportCondaEnvironmentToFile,
   importCondaEnvironmentFromFile,
   listCondaEnvironments,
-  listVirtualEnvironments
+  listVirtualEnvironments,
+  searchCondaPythonVersions
 } from "./services/environment-service.js";
 import {
   getPackageTask,
@@ -114,6 +115,13 @@ async function handleApi(request, response, pathname, searchParams) {
 
     if (request.method === "GET" && pathname === "/api/python/versions") {
       sendJson(response, 200, await discoverPythonVersions());
+      return;
+    }
+
+    if (request.method === "GET" && pathname === "/api/conda/python-versions") {
+      const version = searchParams.get("version") || "";
+      const channel = searchParams.get("channel") || "";
+      sendJson(response, 200, await searchCondaPythonVersions(version, channel, preferredCondaRoot));
       return;
     }
 
