@@ -19,7 +19,7 @@
       <aside class="sidebar">
         <div class="sidebar-panel brand-block">
           <span class="brand-mark">WeiPython Manager</span>
-          <span class="version-chip">v2.6.3</span>
+          <span class="version-chip">v2.6.5</span>
           <p class="eyebrow">Engineering Console</p>
           <h1>尉Python 环境管理器</h1>
           <p class="brand-subtitle">Wei Python Environment Manager</p>
@@ -43,6 +43,7 @@
             <span class="status-caption">Runtime Status</span>
           </div>
           <p id="globalMessage">等待操作。</p>
+          <button class="ghost-button" id="aboutButton" style="margin-top:10px;width:100%">关于</button>
         </div>
       </aside>
 
@@ -54,7 +55,7 @@
             <p class="hero-description">主任务前置，次要信息折叠。创建环境、导入导出 YAML、包维护与日志输出都集中在同一个工作台里。</p>
             <div class="hero-actions">
               <span>尉缭子科技</span>
-              <span>Release 2.6.3</span>
+              <span>Release 2.6.5</span>
             </div>
           </div>
           <div class="hero-meta">
@@ -515,6 +516,73 @@
         <pre id="operationDetails" class="operation-details"></pre>
         <div class="button-row">
           <button class="ghost-button" type="button" id="operationCloseButton" disabled>关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="aboutModal">
+      <div class="modal-card about-card">
+        <div class="about-head">
+          <p class="eyebrow">About</p>
+          <h3>关于</h3>
+          <button class="ghost-button" type="button" id="aboutCloseButton" title="关闭">✕</button>
+        </div>
+        <div class="about-body">
+          <section class="about-section">
+            <h4>软件名称</h4>
+            <p>尉Python 环境管理器（WeiPython Manager）</p>
+          </section>
+
+          <section class="about-section">
+            <h4>当前版本</h4>
+            <p id="aboutVersion">v2.6.5</p>
+          </section>
+
+          <section class="about-section">
+            <h4>软件简介</h4>
+            <p>尉Python 环境管理器是一款面向开发场景的本地环境控制台，统一处理 Python、Conda、venv 与包维护任务。创建环境、导入导出 YAML、包管理与日志输出都集中在同一个工作台里。</p>
+          </section>
+
+          <section class="about-section">
+            <h4>版权所有</h4>
+            <p>© 2026 尉缭子科技. All Rights Reserved.</p>
+            <p class="about-legal">未经著作权人书面许可，任何单位和个人不得对本软件进行复制、修改、反向工程、出租、出售或用于其他违反法律法规的用途。</p>
+          </section>
+
+          <section class="about-section">
+            <h4>开发信息</h4>
+            <div class="about-kv">
+              <span>开发者</span><span>尉缭子科技</span>
+              <span>官方网站</span><span><a href="https://github.com/phoenixlucky/WeiPython" target="_blank" rel="noopener">github.com/phoenixlucky/WeiPython</a></span>
+              <span>电子邮箱</span><span><a href="mailto:phoenixlucky@outlook.com">phoenixlucky@outlook.com</a></span>
+              <span>开源协议</span><span>MIT License</span>
+            </div>
+          </section>
+
+          <section class="about-section">
+            <h4>开源组件声明</h4>
+            <p>本软件使用了部分第三方开源组件。相关组件及其许可证信息详见仓库中的 <code>LICENSE</code> 文件及依赖声明。</p>
+          </section>
+
+          <section class="about-section">
+            <h4>用户协议与隐私政策</h4>
+            <p>使用本软件即表示您已阅读并同意相关用户协议及隐私政策。本软件不会收集任何个人隐私信息，所有数据仅存储在本地。</p>
+          </section>
+
+          <section class="about-section">
+            <h4>免责声明</h4>
+            <p>本软件提供的环境管理功能仅供参考与辅助，不构成专业建议。因用户基于本软件操作所作出的任何决策，其风险由用户自行承担。</p>
+          </section>
+
+          <section class="about-section">
+            <h4>系统信息</h4>
+            <div class="about-kv">
+              <span>运行环境</span><span id="aboutPlatform">检测中...</span>
+              <span>构建版本</span><span id="aboutVersionDetail">v2.6.5</span>
+              <span>Node.js</span><span id="aboutNodeVersion">-</span>
+              <span>Conda</span><span id="aboutCondaState">-</span>
+            </div>
+          </section>
         </div>
       </div>
     </div>

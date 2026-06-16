@@ -1231,6 +1231,110 @@ select {
   overflow: auto;
 }
 
+/* ---------- 关于模态框 ---------- */
+.about-card {
+  width: min(100%, 640px);
+  max-height: min(90vh, 800px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.about-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 28px 16px;
+  border-bottom: 1px solid rgba(232, 160, 191, 0.12);
+  position: sticky;
+  top: 0;
+  background: inherit;
+  backdrop-filter: blur(28px);
+  z-index: 1;
+}
+
+.about-head h3 {
+  margin: 0;
+  font-size: 22px;
+  flex: 1;
+}
+
+.about-head .eyebrow {
+  margin: 0;
+}
+
+.about-head .ghost-button {
+  font-size: 18px;
+  min-height: 36px;
+  padding: 4px 12px;
+  line-height: 1;
+}
+
+.about-body {
+  padding: 20px 28px 28px;
+  overflow-y: auto;
+}
+
+.about-section {
+  margin-bottom: 22px;
+}
+
+.about-section h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-pink);
+  letter-spacing: 0.04em;
+}
+
+.about-section p {
+  margin: 0;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.about-legal {
+  margin-top: 6px !important;
+  font-size: 12px !important;
+  color: var(--muted) !important;
+}
+
+.about-kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.about-kv span:nth-child(odd) {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.about-kv span:nth-child(even) {
+  color: var(--ink-soft);
+}
+
+.about-kv a {
+  color: var(--accent-pink);
+  text-decoration: none;
+}
+
+.about-kv a:hover {
+  text-decoration: underline;
+}
+
+.about-section code {
+  font-family: "Consolas", "Cascadia Code", monospace;
+  font-size: 12px;
+  background: rgba(248, 187, 208, 0.10);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
 
 /* ============================================================
    装饰性动效： 花瓣粒子 · 柔光 · 浮动

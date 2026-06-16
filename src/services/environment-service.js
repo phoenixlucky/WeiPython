@@ -525,12 +525,17 @@ export async function deleteCondaEnvironment(name, preferredRoot = "") {
   const targetEnv = environments.find((env) => env.name === name);
   const condaRoot = getCondaRootFromExecutable(condaPath);
   const fallbackPath = targetEnv?.path || (condaRoot ? path.join(condaRoot, "envs", name) : null);
-  const brokenDirectory = await isBrokenCondaEnvironmentDirectory(fallbackPath);
 
+  // 先尝试 conda env remove
   const result = await runCondaCommand(["env", "remove", "-n", name, "-y"], preferredRoot);
+
   if (!result.ok) {
+    // conda 命令失败 → 检查是否是残留目录问题
     const errorText = `${result.stderr || ""}\n${result.stdout || ""}`;
-    if (errorText.includes("DirectoryNotACondaEnvironmentError") || brokenDirectory) {
+    const isDirectoryError = errorText.includes("DirectoryNotACondaEnvironmentError");
+    const isBroken = fallbackPath && (await isBrokenCondaEnvironmentDirectory(fallbackPath));
+
+    if (isDirectoryError || isBroken) {
       if (fallbackPath && (await pathExists(fallbackPath))) {
         await fs.rm(fallbackPath, { recursive: true, force: true });
         return { message: `环境 '${name}' 的 conda 元数据已失效，已清理残留目录: ${fallbackPath}` };
@@ -539,6 +544,13 @@ export async function deleteCondaEnvironment(name, preferredRoot = "") {
 
     throw new Error(formatCondaFailure(result.stderr, result.stdout));
   }
+
+  // conda env remove 成功，但仍有残留目录 → 清理
+  if (fallbackPath && (await pathExists(fallbackPath))) {
+    await fs.rm(fallbackPath, { recursive: true, force: true });
+    return { message: `环境 '${name}' 删除成功，已清理残留目录` };
+  }
+
   return { message: `环境 '${name}' 删除成功` };
 }
 

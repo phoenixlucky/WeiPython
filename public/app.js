@@ -67,7 +67,13 @@ const elements = {
   condaClonePythonVersionSelect: document.querySelector("#condaClonePythonVersionSelect"),
   condaCreateChannelSelect: document.querySelector("#condaCreateChannelSelect"),
   condaCloneChannelSelect: document.querySelector("#condaCloneChannelSelect"),
-  refreshCondaCreateVersionsButton: document.querySelector("#refreshCondaCreateVersionsButton")
+  refreshCondaCreateVersionsButton: document.querySelector("#refreshCondaCreateVersionsButton"),
+  aboutButton: document.querySelector("#aboutButton"),
+  aboutModal: document.querySelector("#aboutModal"),
+  aboutCloseButton: document.querySelector("#aboutCloseButton"),
+  aboutPlatform: document.querySelector("#aboutPlatform"),
+  aboutNodeVersion: document.querySelector("#aboutNodeVersion"),
+  aboutCondaState: document.querySelector("#aboutCondaState")
 };
 
 let confirmResolver = null;
@@ -840,6 +846,8 @@ async function loadCreateFormVersions(channel) {
         }
       }
     }
+    // 该通道无缓存数据时，不清空已有下拉选项
+    if (!versions.length) return;
     versions.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
     populateCreateFormVersions("", versions);
   } catch {
@@ -1806,6 +1814,28 @@ function wireListActions() {
   });
 }
 
+function wireAboutModal() {
+  elements.aboutButton.addEventListener("click", () => {
+    // 动态填充系统信息
+    if (state.overview) {
+      elements.aboutPlatform.textContent = `${state.overview.platform || "?"} / ${state.overview.arch || "?"}`;
+      elements.aboutNodeVersion.textContent = state.overview.systemNodeVersion || state.overview.nodeVersion || "-";
+      elements.aboutCondaState.textContent = state.overview.condaPath ? `已连接 (${state.overview.condaPath})` : "未检测到";
+    }
+    elements.aboutModal.classList.remove("hidden");
+  });
+
+  elements.aboutCloseButton.addEventListener("click", () => {
+    elements.aboutModal.classList.add("hidden");
+  });
+
+  elements.aboutModal.addEventListener("click", (event) => {
+    if (event.target === elements.aboutModal) {
+      elements.aboutModal.classList.add("hidden");
+    }
+  });
+}
+
 async function bootstrap() {
   wireNavigation();
   wireConfirmModal();
@@ -1814,6 +1844,7 @@ async function bootstrap() {
   wireVenvForm();
   wirePackageActions();
   wireListActions();
+  wireAboutModal();
 
   document.querySelector("#refreshOverviewButton").addEventListener("click", async () => {
     try {
