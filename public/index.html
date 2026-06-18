@@ -19,7 +19,7 @@
       <aside class="sidebar">
         <div class="sidebar-panel brand-block">
           <span class="brand-mark">WeiPython Manager</span>
-          <span class="version-chip">v2.6.6</span>
+          <span class="version-chip">v2.7.0</span>
           <p class="eyebrow">Engineering Console</p>
           <h1>尉Python 环境管理器</h1>
           <p class="brand-subtitle">Wei Python Environment Manager</p>
@@ -30,6 +30,7 @@
           <p class="sidebar-title">工作区</p>
           <nav class="nav-list">
             <button class="nav-item active" data-panel="overview">概览</button>
+            <button class="nav-item" data-panel="setup">初始化配置</button>
             <button class="nav-item" data-panel="conda">Conda</button>
             <button class="nav-item" data-panel="conda-python">Python 版本</button>
             <button class="nav-item" data-panel="venv">虚拟环境</button>
@@ -55,7 +56,7 @@
             <p class="hero-description">主任务前置，次要信息折叠。创建环境、导入导出 YAML、包维护与日志输出都集中在同一个工作台里。</p>
             <div class="hero-actions">
               <span>尉缭子科技</span>
-              <span>Release 2.6.6</span>
+              <span>Release 2.7.0</span>
             </div>
           </div>
           <div class="hero-meta">
@@ -94,6 +95,110 @@
               </div>
               <div id="condaOverviewList" class="list-stack compact-list"></div>
             </article>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-setup">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">First-run Setup</p>
+              <h3>新电脑初始化配置</h3>
+            </div>
+            <button class="ghost-button" id="refreshSetupButton">重新检测</button>
+          </div>
+
+          <div class="setup-layout">
+            <article class="surface-card accent-card command-card">
+              <div class="card-badge-row">
+                <span class="card-badge">One-click Setup</span>
+                <span class="card-badge subtle">conda-forge</span>
+              </div>
+              <div class="section-head">
+                <h4>安装 Miniconda 并创建首个环境</h4>
+                <span id="setupStateBadge">等待检测</span>
+              </div>
+              <p class="setup-intro">适用于新电脑。程序会检测现有 Conda，缺失时安装最新版 Miniconda，再从 conda-forge 查询最新版稳定 Python 并创建首个开发环境。</p>
+
+              <form id="setupForm" class="stack-form">
+                <div class="form-slab">
+                  <label>
+                    <span>Miniconda 安装目录</span>
+                    <input name="installPath" id="setupInstallPath" required />
+                  </label>
+                  <div class="setup-facts">
+                    <div><span>环境命名</span><strong>按版本自动生成，如 py3146</strong></div>
+                    <div><span>软件源</span><strong>conda-forge</strong></div>
+                    <div><span>基础组件</span><strong>最新版 Python + ipykernel</strong></div>
+                  </div>
+                </div>
+
+                <div class="setup-package-section">
+                  <div class="section-head compact-section-head">
+                    <div>
+                      <h4>Conda 常用库</h4>
+                      <p>适合科学计算和数据文件处理，由 conda-forge 安装。</p>
+                    </div>
+                    <button class="ghost-button mini-button" type="button" data-toggle-setup-packages="conda">全选 / 清空</button>
+                  </div>
+                  <div class="package-choice-grid" id="setupCondaPackages"></div>
+                </div>
+
+                <div class="setup-package-section">
+                  <div class="section-head compact-section-head">
+                    <div>
+                      <h4>pip 常用库</h4>
+                      <p>参考 py3146 的顶层工具库，在环境创建完成后安装。</p>
+                    </div>
+                    <button class="ghost-button mini-button" type="button" data-toggle-setup-packages="pip">全选 / 清空</button>
+                  </div>
+                  <div class="package-choice-grid" id="setupPipPackages"></div>
+                </div>
+                <button class="primary-button" type="submit" id="startSetupButton">开始初始化</button>
+              </form>
+            </article>
+
+            <div class="aside-stack">
+              <article class="surface-card miniconda-maintenance-card">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">System Maintenance</p>
+                    <h4>Miniconda 维护</h4>
+                  </div>
+                  <span id="minicondaMaintenanceState">等待检测</span>
+                </div>
+                <div class="maintenance-kv">
+                  <span>Conda 版本</span><strong id="minicondaVersion">-</strong>
+                  <span>base Python</span><strong id="minicondaBasePython">-</strong>
+                  <span>安装目录</span><strong id="minicondaRootPath">-</strong>
+                  <span>已登记环境</span><strong id="minicondaEnvironmentCount">0</strong>
+                </div>
+                <p class="maintenance-note" id="minicondaMaintenanceNote">只更新 base 中的 Conda 核心包，不修改已有业务环境；升级前会自动备份 base 配置。</p>
+                <button class="primary-button" type="button" id="upgradeMinicondaButton">检查并无损升级</button>
+              </article>
+
+              <article class="surface-card">
+                <div class="section-head">
+                  <h4>执行步骤</h4>
+                  <span id="setupProgressText">0%</span>
+                </div>
+                <div class="setup-progress" aria-hidden="true"><span id="setupProgressBar"></span></div>
+                <ol class="setup-steps">
+                  <li data-setup-stage="detect">检测电脑上的 Conda</li>
+                  <li data-setup-stage="download">下载并安装最新版 Miniconda</li>
+                  <li data-setup-stage="resolve">查询 conda-forge 最新 Python</li>
+                  <li data-setup-stage="environment">创建首个 Conda 环境</li>
+                  <li data-setup-stage="packages">安装选择的 Conda 与 pip 库</li>
+                </ol>
+              </article>
+
+              <article class="surface-card output-card">
+                <div class="section-head">
+                  <h4>初始化日志</h4>
+                  <span>Console</span>
+                </div>
+                <pre class="console-surface setup-console" id="setupOutput">尚未开始。</pre>
+              </article>
+            </div>
           </div>
         </section>
 
@@ -524,7 +629,7 @@
       <div class="modal-card about-card">
         <div class="about-head">
           <p class="eyebrow">About</p>
-          <h3>WeiPython Manager / 尉Python 环境管理器 v2.6.6</h3>
+          <h3>WeiPython Manager / 尉Python 环境管理器 v2.7.0</h3>
           <button class="ghost-button" type="button" id="aboutCloseButton" title="关闭">✕</button>
         </div>
         <div class="about-body">
@@ -535,7 +640,7 @@
 
           <section class="about-section">
             <h4>当前版本</h4>
-            <p id="aboutVersion">v2.6.6</p>
+            <p id="aboutVersion">v2.7.0</p>
           </section>
 
           <section class="about-section">
@@ -578,7 +683,7 @@
             <h4>系统信息</h4>
             <div class="about-kv">
               <span>运行环境</span><span id="aboutPlatform">检测中...</span>
-              <span>构建版本</span><span id="aboutVersionDetail">v2.6.6</span>
+              <span>构建版本</span><span id="aboutVersionDetail">v2.7.0</span>
               <span>Node.js</span><span id="aboutNodeVersion">-</span>
               <span>Conda</span><span id="aboutCondaState">-</span>
             </div>

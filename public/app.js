@@ -8,7 +8,9 @@ const state = {
   condaFullVersions: [],
   condaFullVersionsLoading: false,
   condaChannel: "defaults",
-  installedPackages: []
+  installedPackages: [],
+  setup: null,
+  setupTask: null
 };
 
 const elements = {
@@ -73,7 +75,24 @@ const elements = {
   aboutCloseButton: document.querySelector("#aboutCloseButton"),
   aboutPlatform: document.querySelector("#aboutPlatform"),
   aboutNodeVersion: document.querySelector("#aboutNodeVersion"),
-  aboutCondaState: document.querySelector("#aboutCondaState")
+  aboutCondaState: document.querySelector("#aboutCondaState"),
+  setupForm: document.querySelector("#setupForm"),
+  setupInstallPath: document.querySelector("#setupInstallPath"),
+  setupStateBadge: document.querySelector("#setupStateBadge"),
+  setupProgressText: document.querySelector("#setupProgressText"),
+  setupProgressBar: document.querySelector("#setupProgressBar"),
+  setupOutput: document.querySelector("#setupOutput"),
+  setupCondaPackages: document.querySelector("#setupCondaPackages"),
+  setupPipPackages: document.querySelector("#setupPipPackages"),
+  startSetupButton: document.querySelector("#startSetupButton"),
+  refreshSetupButton: document.querySelector("#refreshSetupButton"),
+  minicondaMaintenanceState: document.querySelector("#minicondaMaintenanceState"),
+  minicondaVersion: document.querySelector("#minicondaVersion"),
+  minicondaBasePython: document.querySelector("#minicondaBasePython"),
+  minicondaRootPath: document.querySelector("#minicondaRootPath"),
+  minicondaEnvironmentCount: document.querySelector("#minicondaEnvironmentCount"),
+  minicondaMaintenanceNote: document.querySelector("#minicondaMaintenanceNote"),
+  upgradeMinicondaButton: document.querySelector("#upgradeMinicondaButton")
 };
 
 let confirmResolver = null;
@@ -304,6 +323,207 @@ function switchPanel(panelName) {
   // 首次切换到包管理面板时懒加载已安装包
   if (panelName === "packages" && !state.installedPackages.length) {
     loadInstalledPackages({ silent: true }).catch(() => {});
+  }
+  if (panelName === "setup" && !state.setup) {
+    loadSetupStatus().catch((error) => setError(error.message));
+  }
+}
+
+const SETUP_STAGE_ORDER = ["detect", "download", "resolve", "environment", "packages", "complete"];
+
+function renderSetupPackageCatalog(catalog = {}) {
+  const renderGroup = (items, type) => (items || []).map((item) => `
+    <label class="package-choice">
+      <input type="checkbox" name="${type}PackageIds" value="${escapeHtml(item.id)}"${item.defaultSelected ? " checked" : ""} />
+      <span class="package-choice-copy">
+        <strong>${escapeHtml(item.label)}</strong>
+        <span>${escapeHtml(item.description)}</span>
+      </span>
+    </label>
+  `).join("");
+
+  elements.setupCondaPackages.innerHTML = renderGroup(catalog.conda, "conda");
+  elements.setupPipPackages.innerHTML = renderGroup(catalog.pip, "pip");
+}
+
+function renderSetupTask(task) {
+  state.setupTask = task;
+  const progress = Number(task?.progress || 0);
+  elements.setupProgressText.textContent = `${progress}%`;
+  elements.setupProgressBar.style.width = `${progress}%`;
+  elements.setupOutput.textContent = task?.output || "尚未开始。";
+  elements.setupOutput.scrollTop = elements.setupOutput.scrollHeight;
+  elements.setupStateBadge.textContent = task?.message || "等待开始";
+
+  const visualStage = task?.stage === "install" ? "download" : task?.stage || "detect";
+  const currentIndex = SETUP_STAGE_ORDER.indexOf(visualStage);
+  document.querySelectorAll("[data-setup-stage]").forEach((item) => {
+    const itemIndex = SETUP_STAGE_ORDER.indexOf(item.dataset.setupStage);
+    item.classList.toggle("complete", task?.status === "completed" || itemIndex < currentIndex);
+    item.classList.toggle("active", task?.status === "running" && itemIndex === currentIndex);
+  });
+}
+
+async function loadSetupStatus(options = {}) {
+  if (!options.silent) setBusy("正在检测初始化状态...");
+  const result = await request("/api/setup/status", { timeoutMs: 20000 });
+  state.setup = result;
+  if (!elements.setupInstallPath.value) {
+    elements.setupInstallPath.value = result.recommendedInstallPath;
+  }
+  renderSetupPackageCatalog(result.packageCatalog);
+  const miniconda = result.miniconda || {};
+  elements.minicondaVersion.textContent = miniconda.condaVersion || "未安装";
+  elements.minicondaBasePython.textContent = miniconda.basePythonVersion || "-";
+  elements.minicondaRootPath.textContent = miniconda.rootPrefix || "-";
+  elements.minicondaEnvironmentCount.textContent = String(miniconda.environmentCount || 0);
+  elements.minicondaMaintenanceState.textContent = miniconda.available ? "已连接" : "未检测到";
+  elements.minicondaMaintenanceNote.textContent = !miniconda.available
+    ? "请先完成 Miniconda 初始化安装。"
+    : miniconda.rootWritable
+      ? "只更新 base 中的 Conda 核心包，不修改已有业务环境；升级前会自动备份 base 配置。"
+      : "当前安装目录需要管理员权限。查看功能可用；升级时请以管理员身份运行 WeiPython。";
+  elements.upgradeMinicondaButton.disabled = !miniconda.available;
+  elements.setupStateBadge.textContent = result.condaAvailable
+    ? `已检测到 Conda · ${result.environments.length} 个环境`
+    : result.platformSupported
+      ? "尚未安装 Conda"
+      : `不支持自动安装 · ${result.platform}/${result.arch}`;
+  elements.startSetupButton.disabled = !result.platformSupported && !result.condaAvailable;
+  if (!options.silent) setReady("初始化状态已更新。");
+  return result;
+}
+
+async function pollMinicondaUpgradeTask(taskId) {
+  while (true) {
+    const task = await request(`/api/setup/tasks/${encodeURIComponent(taskId)}`, { timeoutMs: 20000 });
+    updateOperationModal({
+      eyebrow: task.status === "running" ? "Miniconda Maintenance" : task.status === "completed" ? "Completed" : "Failed",
+      title: task.status === "running" ? "正在检查并升级 Miniconda" : task.status === "completed" ? "Miniconda 维护完成" : "Miniconda 维护失败",
+      message: task.message,
+      details: task.output,
+      closable: task.status !== "running"
+    });
+    if (task.status !== "running") return task;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+async function upgradeMiniconda() {
+  const miniconda = state.setup?.miniconda;
+  if (!miniconda?.available) {
+    setError("未检测到 Miniconda，请先完成初始化安装。");
+    return;
+  }
+  const confirmed = await askConfirm({
+    title: "无损升级 Miniconda",
+    message: [
+      `当前 Conda 版本：${miniconda.condaVersion || "未知"}`,
+      `安装目录：${miniconda.rootPrefix}`,
+      `已登记环境：${miniconda.environmentCount} 个`,
+      "",
+      "升级只修改 base 环境中的 Conda 核心包。执行前将导出 base 显式配置，完成后核对所有环境路径。",
+      ...(miniconda.rootWritable ? [] : ["", "当前目录需要管理员权限；请以管理员身份运行 WeiPython 后执行。"])
+    ].join("\n"),
+    confirmText: "检查并升级"
+  });
+  if (!confirmed) return;
+
+  elements.upgradeMinicondaButton.disabled = true;
+  setBusy("正在检查 Miniconda 更新...");
+  showOperationModal({
+    eyebrow: "Miniconda Maintenance",
+    title: "正在检查并升级 Miniconda",
+    message: "正在读取当前版本并查询可用更新。",
+    details: "准备中...",
+    closable: false
+  });
+  try {
+    const started = await request("/api/setup/miniconda-upgrade", {
+      method: "POST",
+      timeoutMs: 20000,
+      body: JSON.stringify({ installPath: miniconda.rootPrefix })
+    });
+    const completed = await pollMinicondaUpgradeTask(started.taskId);
+    if (completed.status === "failed") throw new Error(completed.message);
+    await Promise.all([loadSetupStatus({ silent: true }), loadOverview()]);
+    setReady(completed.message);
+  } catch (error) {
+    setError(error.message);
+    updateOperationModal({
+      eyebrow: "Failed",
+      title: "Miniconda 维护失败",
+      message: error.message,
+      closable: true
+    });
+  } finally {
+    elements.upgradeMinicondaButton.disabled = !state.setup?.miniconda?.available;
+  }
+}
+
+async function pollSetupTask(taskId) {
+  while (true) {
+    const task = await request(`/api/setup/tasks/${encodeURIComponent(taskId)}`, { timeoutMs: 20000 });
+    renderSetupTask(task);
+    updateOperationModal({
+      eyebrow: task.status === "running" ? "First-run Setup" : task.status === "completed" ? "Completed" : "Failed",
+      title: task.status === "running" ? "正在初始化 Python 环境" : task.status === "completed" ? "初始化完成" : "初始化失败",
+      message: task.message,
+      details: task.output,
+      closable: task.status !== "running"
+    });
+    if (task.status !== "running") return task;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+async function initializeComputer(event) {
+  event.preventDefault();
+  const installPath = elements.setupInstallPath.value.trim();
+  const condaPackageIds = [...elements.setupForm.querySelectorAll('input[name="condaPackageIds"]:checked')]
+    .map((input) => input.value);
+  const pipPackageIds = [...elements.setupForm.querySelectorAll('input[name="pipPackageIds"]:checked')]
+    .map((input) => input.value);
+  const confirmed = await askConfirm({
+    title: "开始初始化配置",
+    message: state.setup?.condaAvailable
+      ? `已检测到 Conda。将跳过 Miniconda 安装，创建或更新最新版 Python 环境。\n\n已选择：${condaPackageIds.length} 个 Conda 库，${pipPackageIds.length} 个 pip 库。`
+      : `将下载并静默安装最新版 Miniconda 到：\n${installPath}\n\n随后创建 conda-forge 最新 Python 环境，并安装 ${condaPackageIds.length} 个 Conda 库、${pipPackageIds.length} 个 pip 库。`,
+    confirmText: "开始初始化"
+  });
+  if (!confirmed) return;
+
+  elements.startSetupButton.disabled = true;
+  setBusy("正在初始化 Miniconda 与首个 Conda 环境...");
+  showOperationModal({
+    eyebrow: "First-run Setup",
+    title: "正在初始化 Python 环境",
+    message: "正在启动初始化任务。",
+    details: "准备中...",
+    closable: false
+  });
+
+  try {
+    const started = await request("/api/setup/tasks", {
+      method: "POST",
+      timeoutMs: 20000,
+      body: JSON.stringify({ installPath, condaPackageIds, pipPackageIds })
+    });
+    renderSetupTask(started);
+    const completed = await pollSetupTask(started.taskId);
+    if (completed.status === "failed") throw new Error(completed.message);
+    await Promise.all([loadSetupStatus({ silent: true }), loadOverview()]);
+    setReady(completed.message);
+  } catch (error) {
+    setError(error.message);
+    updateOperationModal({
+      eyebrow: "Failed",
+      title: "初始化失败",
+      message: error.message,
+      closable: true
+    });
+  } finally {
+    elements.startSetupButton.disabled = false;
   }
 }
 
@@ -1881,6 +2101,24 @@ function wireAboutModal() {
   });
 }
 
+function wireSetup() {
+  elements.setupForm.addEventListener("submit", initializeComputer);
+  elements.refreshSetupButton.addEventListener("click", () => {
+    loadSetupStatus().catch((error) => setError(error.message));
+  });
+  elements.upgradeMinicondaButton.addEventListener("click", upgradeMiniconda);
+  document.querySelectorAll("[data-toggle-setup-packages]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const type = button.dataset.toggleSetupPackages;
+      const checkboxes = [...elements.setupForm.querySelectorAll(`input[name="${type}PackageIds"]`)];
+      const shouldSelect = checkboxes.some((checkbox) => !checkbox.checked);
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = shouldSelect;
+      });
+    });
+  });
+}
+
 async function bootstrap() {
   wireNavigation();
   wireConfirmModal();
@@ -1890,6 +2128,7 @@ async function bootstrap() {
   wirePackageActions();
   wireListActions();
   wireAboutModal();
+  wireSetup();
 
   document.querySelector("#refreshOverviewButton").addEventListener("click", async () => {
     try {

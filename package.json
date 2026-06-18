@@ -1,6 +1,6 @@
 {
   "name": "pythonbb-web",
-  "version": "2.6.6",
+  "version": "2.7.0",
   "private": true,
   "description": "Python Environment Management Tool",
   "author": "尉缭子科技",
@@ -9,6 +9,7 @@
   "scripts": {
     "web": "node src/server.js",
     "desktop": "electron .",
+    "test": "node --test",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --win nsis"
   },

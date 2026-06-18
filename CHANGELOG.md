@@ -1,4 +1,42 @@
 # 更新日志
+## v2.7.0 - 首次运行初始化向导与 Miniconda 无损升级 (2026-06-18)
+
+### 🚀 新增功能
+
+#### 首次运行初始化向导（First-run Setup）
+- ✅ 新增「初始化配置」导航面板，一键完成新电脑 Python 环境搭建
+- ✅ 自动检测现有 Conda，缺失时静默下载安装最新版 Miniconda
+- ✅ 安装路径自定义配置，自动推荐默认安装目录
+- ✅ Conda / pip 分组包目录展示，支持多选预装包
+- ✅ 初始化任务可视化进度条，分阶段展示（检测 → 下载 → 解析依赖 → 创建环境 → 安装包 → 完成）
+- ✅ 操作弹窗实时显示安装输出日志，完成后自动刷新概览
+
+#### Miniconda 无损升级
+- ✅ 新增 Miniconda 维护卡片，展示 Conda 版本、base Python 版本、环境数
+- ✅ 一键升级仅更新 base 环境中的 Conda 核心包，不修改已有业务环境
+- ✅ 升级前自动导出 base 显式配置，完成后核对所有环境路径
+- ✅ 需要管理员权限时给出明确提示，引导用户以管理员身份运行
+
+### 🔧 技术改进
+
+#### 后端
+- ✅ 新增 `src/services/setup-service.js` — 初始化与 Miniconda 维护服务模块
+- ✅ 新增 `GET /api/setup/status` — 返回初始化状态（Conda 检测、平台架构、包目录、推荐安装路径）
+- ✅ 新增 `POST /api/setup/tasks` — 启动异步初始化安装任务
+- ✅ 新增 `GET /api/setup/tasks/:id` — 轮询任务实时进度与输出日志
+- ✅ 新增 `POST /api/setup/miniconda-upgrade` — 启动 Miniconda 无损升级任务
+- ✅ 初始化任务支持流式 stdout/stderr 回调，长度控制避免内存堆积
+- ✅ 任务状态含 stage、progress、output、message 等完整字段
+
+#### 前端
+- ✅ 新增导航按钮「初始化配置」及对应面板 `#panel-setup`
+- ✅ 双列布局：左侧安装区域 + 右侧 Miniconda 维护卡片
+- ✅ 包选择目录支持「全选/清空」切换按钮
+- ✅ 新增 `.setup-layout`、`.setup-facts`、`.setup-progress`、`.setup-steps`、`.setup-console` 等组件样式
+- ✅ 初始化状态检测、任务轮询、错误重试完整的生命周期管理
+
+---
+
 ## v2.6.6 - Conda 环境克隆增强与 pip 回退安装 (2026-06-16)
 
 ### 🚀 新增功能

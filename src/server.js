@@ -32,6 +32,12 @@ import {
   upgradePip
 } from "./services/package-service.js";
 import { getSystemOverview, upgradeNodeVersion } from "./services/system-service.js";
+import {
+  getSetupStatus,
+  getSetupTask,
+  startMinicondaUpgradeTask,
+  startSetupTask
+} from "./services/setup-service.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -107,6 +113,27 @@ async function handleApi(request, response, pathname, searchParams) {
 
     if (request.method === "GET" && pathname === "/api/overview") {
       sendJson(response, 200, await getSystemOverview(preferredCondaRoot));
+      return;
+    }
+
+    if (request.method === "GET" && pathname === "/api/setup/status") {
+      sendJson(response, 200, await getSetupStatus());
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/setup/tasks") {
+      sendJson(response, 200, await startSetupTask(await readBody(request)));
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/setup/miniconda-upgrade") {
+      sendJson(response, 200, await startMinicondaUpgradeTask(await readBody(request)));
+      return;
+    }
+
+    if (request.method === "GET" && pathname.startsWith("/api/setup/tasks/")) {
+      const taskId = decodeURIComponent(pathname.split("/").pop());
+      sendJson(response, 200, getSetupTask(taskId));
       return;
     }
 
