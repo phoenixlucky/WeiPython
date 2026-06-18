@@ -1,4 +1,20 @@
 # 更新日志
+## v2.7.1 - Conda 更新残留文件清理 (2026-06-18)
+
+### 🐛 Bug 修复
+
+- ✅ 新增 `cleanupStaleCondaUpdateArtifacts` 自动清理 conda update 产生的残留临时文件（`conda.exe.c~` 及 `.conda_trash` 标记）
+- ✅ 新增 `isRecoverableCondaCleanupFailure` 识别可安全忽略的 conda 清理错误
+- ✅ 在 Miniconda 升级流程中自动执行残留清理，避免 Scripts 目录堆积垃圾文件
+
+### 🔧 技术改进
+
+- ✅ 支持跨平台（Windows 专属清理逻辑，非 Windows 直接跳过）
+- ✅ 排序清除策略：优先清理 `.conda_trash` 标记文件，再清理普通 `.c~` 残留
+- ✅ 添加完善的单测覆盖（`test/setup-service.test.js`）
+
+---
+
 ## v2.7.0 - 首次运行初始化向导与 Miniconda 无损升级 (2026-06-18)
 
 ### 🚀 新增功能
@@ -16,6 +32,8 @@
 - ✅ 一键升级仅更新 base 环境中的 Conda 核心包，不修改已有业务环境
 - ✅ 升级前自动导出 base 显式配置，完成后核对所有环境路径
 - ✅ 需要管理员权限时给出明确提示，引导用户以管理员身份运行
+- ✅ 修复 Windows 上历史 `conda.exe.c~.conda_trash` 残留导致升级收尾失败的问题
+- ✅ Conda 核心已更新但临时文件清理报错时，自动清理、恢复并继续核对环境路径
 
 ### 🔧 技术改进
 

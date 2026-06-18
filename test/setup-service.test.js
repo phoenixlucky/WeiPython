@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   buildEnvironmentName,
+  cleanupStaleCondaUpdateArtifacts,
   comparePythonVersions,
   getSetupPackageCatalog,
   normalizeSelectedPackages,
+  isRecoverableCondaCleanupFailure,
   resolveLatestCondaVersion,
   resolveLatestStablePythonVersion
 } from "../src/services/setup-service.js";
@@ -59,4 +64,30 @@ test("resolves the latest stable Conda core version", () => {
   assert.equal(resolveLatestCondaVersion({
     conda: [{ version: "25.9.1" }, { version: "26.1.0" }, { version: "25.11.1" }, { version: "26.1.0rc1" }]
   }), "26.1.0");
+});
+
+test("recognizes the Windows Conda cleanup failure", () => {
+  assert.equal(isRecoverableCondaCleanupFailure(
+    "AttributeError: 'str' object has no attribute 'splitext'\nD:\\Miniconda\\Scripts\\conda.exe.c~.conda_trash"
+  ), true);
+  assert.equal(isRecoverableCondaCleanupFailure("PackagesNotFoundError: missing"), false);
+});
+
+test("cleans only known Conda self-update artifacts", { skip: process.platform !== "win32" }, async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "weipython-conda-cleanup-"));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const scripts = path.join(root, "Scripts");
+  await fs.mkdir(scripts);
+  await Promise.all([
+    fs.writeFile(path.join(scripts, "conda.exe.c~"), "temporary"),
+    fs.writeFile(path.join(scripts, "conda.exe.c~.conda_trash"), "trash"),
+    fs.writeFile(path.join(scripts, "conda.exe"), "keep"),
+    fs.writeFile(path.join(scripts, "unrelated.conda_trash"), "keep")
+  ]);
+
+  const result = await cleanupStaleCondaUpdateArtifacts(root);
+  assert.deepEqual(result.failed, []);
+  assert.deepEqual(new Set(result.removed), new Set(["conda.exe.c~", "conda.exe.c~.conda_trash"]));
+  assert.equal(await fs.readFile(path.join(scripts, "conda.exe"), "utf8"), "keep");
+  assert.equal(await fs.readFile(path.join(scripts, "unrelated.conda_trash"), "utf8"), "keep");
 });

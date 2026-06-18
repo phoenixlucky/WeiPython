@@ -117,6 +117,48 @@ export function resolveLatestCondaVersion(searchOutput) {
   return uniqueVersions.at(-1);
 }
 
+const CONDA_UPDATE_ARTIFACT_PATTERN = /^conda(?:\.exe)?\.c~(?:\.conda_trash(?:_\d+)?)?$/i;
+
+export function isRecoverableCondaCleanupFailure(stderr = "", stdout = "") {
+  const output = `${stderr}\n${stdout}`;
+  return /conda\.exe\.c~/i.test(output) && (
+    /\.conda_trash/i.test(output)
+    || /unlink_or_rename_to_trash/i.test(output)
+    || /has no attribute ['"]splitext['"]/i.test(output)
+  );
+}
+
+export async function cleanupStaleCondaUpdateArtifacts(installRoot) {
+  if (process.platform !== "win32") return { removed: [], failed: [] };
+
+  const scriptsDirectory = path.join(installRoot, "Scripts");
+  let entries;
+  try {
+    entries = await fsp.readdir(scriptsDirectory, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === "ENOENT") return { removed: [], failed: [] };
+    throw error;
+  }
+
+  const artifactNames = entries
+    .filter((entry) => entry.isFile() && CONDA_UPDATE_ARTIFACT_PATTERN.test(entry.name))
+    .map((entry) => entry.name)
+    .sort((left, right) => Number(right.includes(".conda_trash")) - Number(left.includes(".conda_trash")));
+  const removed = [];
+  const failed = [];
+
+  for (const name of artifactNames) {
+    try {
+      await fsp.unlink(path.join(scriptsDirectory, name));
+      removed.push(name);
+    } catch (error) {
+      failed.push({ name, code: error?.code || "UNKNOWN" });
+    }
+  }
+
+  return { removed, failed };
+}
+
 export function buildEnvironmentName(pythonVersion) {
   return `py${String(pythonVersion).replace(/\D/g, "")}`;
 }
@@ -384,8 +426,21 @@ async function runMinicondaUpgrade(task) {
     const beforePaths = beforeEnvironments.environments.map((environment) => environment.path);
     await createBaseBackup(task);
 
+    setStage(task, "prepare", "正在清理旧的 Conda 升级临时文件", 55);
+    const preflightCleanup = await cleanupStaleCondaUpdateArtifacts(task.installPath);
+    if (preflightCleanup.removed.length) {
+      appendLog(task, `已清理: ${preflightCleanup.removed.join(", ")}\n`);
+    }
+    const blockedTrashFiles = preflightCleanup.failed.filter((item) => item.name.includes(".conda_trash"));
+    if (blockedTrashFiles.length) {
+      throw new Error(`无法清理旧的 Conda 升级残留（${blockedTrashFiles.map((item) => item.name).join(", ")}）；请关闭占用该 Miniconda 的 Python/Conda 进程后重试`);
+    }
+    if (preflightCleanup.failed.length) {
+      appendLog(task, `暂时无法删除（将由 Conda 接管）: ${preflightCleanup.failed.map((item) => `${item.name} [${item.code}]`).join(", ")}\n`);
+    }
+
     setStage(task, "upgrade", `正在将 Conda ${task.currentCondaVersion} 升级到 ${task.latestCondaVersion}`, 65);
-    const updateResult = await runCondaCommand([
+    const updateArgs = [
       "update",
       "-n",
       "base",
@@ -393,9 +448,31 @@ async function runMinicondaUpgrade(task) {
       "defaults",
       "conda",
       "-y"
-    ], task.installPath);
+    ];
+    let updateResult = await runCondaCommand(updateArgs, task.installPath);
     appendLog(task, updateResult.stdout);
     appendLog(task, updateResult.stderr ? `[stderr] ${updateResult.stderr}` : "");
+
+    if (!updateResult.ok && isRecoverableCondaCleanupFailure(updateResult.stderr, updateResult.stdout)) {
+      appendLog(task, "\n检测到 Conda 在 Windows 上清理升级临时文件失败，正在安全恢复。\n");
+      const recoveryCleanup = await cleanupStaleCondaUpdateArtifacts(task.installPath);
+      if (recoveryCleanup.removed.length) {
+        appendLog(task, `恢复清理: ${recoveryCleanup.removed.join(", ")}\n`);
+      }
+
+      clearCondaCache();
+      const recoveredInfo = await getMinicondaInfo(task.installPath);
+      if (comparePythonVersions(recoveredInfo.condaVersion, task.latestCondaVersion) >= 0) {
+        appendLog(task, `Conda 核心已升级到 ${recoveredInfo.condaVersion}；原错误仅发生在事务收尾，继续完整性校验。\n`);
+        updateResult = { ...updateResult, ok: true };
+      } else if (!recoveryCleanup.failed.some((item) => item.name.includes(".conda_trash"))) {
+        appendLog(task, "清理完成，正在重试一次 Conda 核心升级。\n");
+        updateResult = await runCondaCommand(updateArgs, task.installPath);
+        appendLog(task, updateResult.stdout);
+        appendLog(task, updateResult.stderr ? `[stderr] ${updateResult.stderr}` : "");
+      }
+    }
+
     if (!updateResult.ok) throw new Error(updateResult.stderr || updateResult.stdout || "升级 Conda 核心失败");
 
     setStage(task, "verify", "正在校验 Conda 版本与原有环境", 90);
