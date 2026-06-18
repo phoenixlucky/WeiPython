@@ -546,6 +546,17 @@
                       <button class="ghost-button" type="button" id="upgradePipButton">升级 pip</button>
                       <button class="primary-button" type="button" id="upgradeAllPackagesButton">一键升级全部包</button>
                     </div>
+                    <div style="display:flex;align-items:center;gap:12px;margin:0 0 8px">
+                      <span style="font-size:12px;color:var(--muted)">升级源：</span>
+                      <label class="check-line framed-check" style="margin:0">
+                        <input type="radio" name="upgradeCondaChannel" value="defaults" checked />
+                        <span>defaults</span>
+                      </label>
+                      <label class="check-line framed-check" style="margin:0">
+                        <input type="radio" name="upgradeCondaChannel" value="conda-forge" />
+                        <span>conda-forge</span>
+                      </label>
+                    </div>
                     <div class="form-slab">
                       <label>
                         <span>Conda Python 目标版本</span>

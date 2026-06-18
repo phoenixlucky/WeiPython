@@ -7,6 +7,7 @@ import {
   parseJsonCommandOutput,
   runCondaCommand
 } from "./environment-service.js";
+import { stripPythonWarnings } from "../utils/process.js";
 
 const tasks = new Map();
 const TASK_TTL_MS = 60 * 60 * 1000;
@@ -35,9 +36,23 @@ export function extractPlatformPythonVersions(records, subdir = getCurrentCondaS
     .filter(Boolean);
 }
 
-export function buildPythonInstallArgs(environmentPath, targetVersion, dryRun = false) {
+// 与 environment-service 的 buildCondaChannelArgs 保持一致：
+// defaults 走内置源（不传 -c），其它源（如 conda-forge）用 -c <channel> --override-channels，
+// 确保升级只从指定源求解，避免 defaults 与 conda-forge 混装带来不可控的依赖调整。
+const SUPPORTED_CHANNELS = ["defaults", "conda-forge"];
+
+function normalizeChannel(channel) {
+  return SUPPORTED_CHANNELS.includes(channel) ? channel : "defaults";
+}
+
+function buildChannelArgs(channel) {
+  const safe = normalizeChannel(channel);
+  return safe && safe !== "defaults" ? ["-c", safe, "--override-channels"] : ["--override-channels", "-c", "defaults"];
+}
+
+export function buildPythonInstallArgs(environmentPath, targetVersion, dryRun = false, channel = "defaults") {
   const args = [
-    "install", "-p", environmentPath, "--override-channels", "-c", "defaults", `python=${targetVersion}`, "-y"
+    "install", "-p", environmentPath, ...buildChannelArgs(channel), `python=${targetVersion}`, "-y"
   ];
   if (dryRun) args.push("--dry-run", "--json");
   return args;
@@ -86,6 +101,7 @@ function snapshot(task) {
     target: task.target,
     currentVersion: task.currentVersion,
     targetVersion: task.targetVersion,
+    channel: task.channel,
     backupPath: task.backupPath,
     output: task.output,
     startedAt: task.startedAt,
@@ -114,23 +130,60 @@ async function resolveCondaTarget(target, preferredRoot) {
   return { environment, allEnvironments: result.environments };
 }
 
-export async function checkCondaPythonUpgrade(target, preferredRoot = "") {
+/**
+ * 检测 stderr 是否为 Node.js 自动生成的 "Command failed: ..." 消息而非 conda 自身的错误。
+ * 这类消息对用户无意义，应替换为可读的中文提示。
+ */
+function isNodeCommandFailedError(text) {
+  return /^Command failed:/.test(String(text || "").trim());
+}
+
+export async function checkCondaPythonUpgrade(target, preferredRoot = "", channel = "defaults") {
+  const safeChannel = normalizeChannel(channel);
   const { environment } = await resolveCondaTarget(target, preferredRoot);
-  const search = await runCondaCommand([
-    "search", "--override-channels", "-c", "defaults", "python", "--json"
+
+  // 尝试用户选择的频道搜索 Python 版本
+  let search = await runCondaCommand([
+    "search", ...buildChannelArgs(safeChannel), "python", "--json"
   ], preferredRoot);
-  if (!search.ok) throw new Error(search.stderr || search.stdout || "查询 Python 可升级版本失败");
+
+  let effectiveChannel = safeChannel;
+
+  // 如果搜索失败，且当前是 defaults，自动 fallback 到 conda-forge
+  if (!search.ok && safeChannel === "defaults") {
+    search = await runCondaCommand([
+      "search", ...buildChannelArgs("conda-forge"), "python", "--json"
+    ], preferredRoot);
+    if (search.ok) effectiveChannel = "conda-forge";
+  }
+
+  if (!search.ok) {
+    const raw = search.stderr || search.stdout || "";
+    if (isNodeCommandFailedError(raw)) {
+      throw new Error(
+        `Conda 搜索 Python 版本失败。可能的原因：\n`
+        + `1. Conda 环境因上次升级失败而损坏\n`
+        + `2. 网络连接问题\n\n`
+        + `建议：重启程序后重试，或尝试切换到 conda-forge 源。`
+      );
+    }
+    throw new Error(stripPythonWarnings(raw) || "查询 Python 可升级版本失败");
+  }
+
   const parsed = parseJsonCommandOutput(search.stdout, {});
   const platformVersions = extractPlatformPythonVersions(Array.isArray(parsed.python) ? parsed.python : []);
   const discoveredCandidates = selectPythonUpgradeCandidates(environment.pythonVersion, platformVersions);
   const candidates = [];
   for (const version of discoveredCandidates.slice(0, 6)) {
-    const solved = await runCondaCommand(buildPythonInstallArgs(environment.path, version, true), preferredRoot);
+    const solved = await runCondaCommand(
+      buildPythonInstallArgs(environment.path, version, true, effectiveChannel), preferredRoot
+    );
     if (solved.ok) candidates.push(version);
   }
   return {
     target: { type: "conda", name: environment.name, path: environment.path },
     currentVersion: environment.pythonVersion,
+    channel: effectiveChannel,
     candidates,
     unavailableCandidates: discoveredCandidates.filter((version) => !candidates.includes(version)),
     recommendedVersion: candidates[0] || null
@@ -152,13 +205,20 @@ async function runUpgrade(task, preferredRoot) {
     ], preferredRoot);
     let backupMode = "显式配置";
     if (!exported.ok) {
-      appendLog(task, `显式配置备份不可用，改用完整无构建号备份。\n${exported.stderr || exported.stdout}\n`);
+      appendLog(task, `显式配置备份不可用，改用普通导出。\n${stripPythonWarnings(exported.stderr || exported.stdout)}\n`);
+      exported = await runCondaCommand([
+        "env", "export", "-p", before.environment.path
+      ], preferredRoot);
+      backupMode = "完整配置（含构建号）";
+    }
+    if (!exported.ok) {
+      appendLog(task, `已含构建号的导出仍不可用，改用无构建号导出。\n${stripPythonWarnings(exported.stderr || exported.stdout)}\n`);
       exported = await runCondaCommand([
         "env", "export", "-p", before.environment.path, "--no-builds"
       ], preferredRoot);
       backupMode = "完整配置（无构建号）";
     }
-    if (!exported.ok) throw new Error(exported.stderr || exported.stdout || "备份环境失败");
+    if (!exported.ok) throw new Error(stripPythonWarnings(exported.stderr || exported.stdout) || "备份环境失败");
     const backupDirectory = path.join(os.homedir(), "WeiPythonBackups", "python-upgrades");
     await fs.mkdir(backupDirectory, { recursive: true });
     const safeName = String(before.environment.name || "conda-env").replace(/[^A-Za-z0-9_.-]+/g, "-");
@@ -167,14 +227,14 @@ async function runUpgrade(task, preferredRoot) {
     await fs.writeFile(task.backupPath, exported.stdout, "utf8");
     appendLog(task, `备份模式: ${backupMode}\n备份文件: ${task.backupPath}\n`);
 
-    setStage(task, "upgrade", `正在升级 Python ${task.currentVersion} → ${task.targetVersion}`, 55);
+    setStage(task, "upgrade", `正在升级 Python ${task.currentVersion} → ${task.targetVersion}（源：${task.channel}）`, 55);
     const installed = await runCondaCommand(
-      buildPythonInstallArgs(before.environment.path, task.targetVersion),
+      buildPythonInstallArgs(before.environment.path, task.targetVersion, false, task.channel),
       preferredRoot
     );
     appendLog(task, installed.stdout);
-    if (installed.stderr) appendLog(task, `[stderr] ${installed.stderr}`);
-    if (!installed.ok) throw new Error(installed.stderr || installed.stdout || "升级 Python 失败");
+    if (installed.stderr) appendLog(task, `[stderr] ${stripPythonWarnings(installed.stderr)}`);
+    if (!installed.ok) throw new Error(stripPythonWarnings(installed.stderr || installed.stdout) || "升级 Python 失败");
 
     setStage(task, "verify", "正在校验 Python 版本与全部 Conda 环境路径", 90);
     const after = await listCondaEnvironments(preferredRoot);
@@ -204,6 +264,7 @@ export async function startCondaPythonUpgradeTask(payload = {}, preferredRoot = 
   if (running) return snapshot(running);
   const targetVersion = String(payload.targetVersion || "").trim();
   if (!/^\d+\.\d+\.\d+$/.test(targetVersion)) throw new Error("请选择有效的 Python 目标版本");
+  const safeChannel = normalizeChannel(payload.channel);
   const resolved = await resolveCondaTarget(payload.target, preferredRoot);
   const task = {
     taskId: crypto.randomUUID(),
@@ -214,8 +275,9 @@ export async function startCondaPythonUpgradeTask(payload = {}, preferredRoot = 
     target: { type: "conda", name: resolved.environment.name, path: resolved.environment.path },
     currentVersion: resolved.environment.pythonVersion,
     targetVersion,
+    channel: safeChannel,
     backupPath: null,
-    output: `WeiPython Conda Python 无损升级\n环境: ${resolved.environment.name}\n路径: ${resolved.environment.path}\n目标: Python ${targetVersion}\n`,
+    output: `WeiPython Conda Python 无损升级\n环境: ${resolved.environment.name}\n路径: ${resolved.environment.path}\n源: ${safeChannel}\n目标: Python ${targetVersion}\n`,
     startedAt: new Date().toISOString(),
     finishedAt: null
   };

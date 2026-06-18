@@ -62,6 +62,7 @@ const elements = {
   checkPythonUpgradeButton: document.querySelector("#checkPythonUpgradeButton"),
   upgradePythonButton: document.querySelector("#upgradePythonButton"),
   upgradePythonVersionSelect: document.querySelector("#upgradePythonVersionSelect"),
+  upgradeCondaChannelRadios: document.querySelectorAll("input[name='upgradeCondaChannel']"),
   condaMajorVersionsList: document.querySelector("#condaMajorVersionsList"),
   condaVersionDetailCard: document.querySelector("#condaVersionDetailCard"),
   condaVersionDetailTitle: document.querySelector("#condaVersionDetailTitle"),
@@ -965,6 +966,13 @@ function getSelectedChannel() {
   return "defaults";
 }
 
+function getSelectedUpgradeChannel() {
+  for (const radio of elements.upgradeCondaChannelRadios) {
+    if (radio.checked) return radio.value;
+  }
+  return "defaults";
+}
+
 // 从缓存中获取指定大版本的小版本列表
 function getCachedVersions(cache, major, channel) {
   const channelKey = channel || "defaults";
@@ -1766,10 +1774,11 @@ async function checkSelectedCondaPythonUpgrade() {
   elements.upgradePythonButton.disabled = true;
   setBusy(`正在查询环境“${target.name}”的 Python 可升级版本...`);
   try {
+    const channel = getSelectedUpgradeChannel();
     const result = await request("/api/conda/python-upgrade/check", {
       method: "POST",
       timeoutMs: 120000,
-      body: JSON.stringify({ target })
+      body: JSON.stringify({ target, channel })
     });
     state.pythonUpgradeCheck = result;
     const candidates = result.candidates || [];
@@ -1791,7 +1800,8 @@ async function checkSelectedCondaPythonUpgrade() {
       : unavailableCandidates.length
         ? [
             `环境“${result.target.name}”当前 Python ${result.currentVersion}。`,
-            `检测到更高版本 ${unavailableCandidates.join(", ")}，但 defaults 无法为当前环境完成依赖求解，因此未提供升级。`
+            `检测到更高版本 ${unavailableCandidates.join(", ")}，但 ${result.channel} 无法为当前环境完成依赖求解，因此未提供升级。`,
+            `提示：可切换到 conda-forge 源后重试。`
           ].join("\n")
         : `环境“${result.target.name}”当前 Python ${result.currentVersion}，没有检测到更高的稳定版本。`;
     elements.packageResultMeta.textContent = candidates.length
@@ -1870,10 +1880,11 @@ async function upgradeSelectedCondaPython() {
   });
 
   try {
+    const channel = check.channel || getSelectedUpgradeChannel();
     const started = await request("/api/conda/python-upgrade/tasks", {
       method: "POST",
       timeoutMs: 20000,
-      body: JSON.stringify({ target, targetVersion })
+      body: JSON.stringify({ target, targetVersion, channel })
     });
     const completed = await pollCondaPythonUpgradeTask(started.taskId);
     if (completed.status === "failed") throw new Error(completed.message);
@@ -2202,6 +2213,11 @@ function wirePackageActions() {
     }
   });
   elements.upgradePythonButton.addEventListener("click", () => upgradeSelectedCondaPython());
+  elements.upgradeCondaChannelRadios.forEach((radio) => {
+    radio.addEventListener("change", () => {
+      resetPythonUpgradeControls();
+    });
+  });
   elements.upgradeAllPackagesButton.addEventListener("click", async () => {
     const target = getSelectedTarget();
     if (!target) {

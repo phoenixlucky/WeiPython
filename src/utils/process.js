@@ -1,5 +1,24 @@
 import { exec, spawn } from "node:child_process";
 
+/**
+ * 从 conda / pip 等命令的 stderr 中移除 Python warnings.warn() 产生的噪声行。
+ * 这些行不是实际错误，而是 Python 运行时库（如 requests）在 import 期打印的警告。
+ *
+ * 移除两类行：
+ * 1.  <filepath>:<line>: <WarningType>: <message>       例如 requests/__init__.py:92: RequestsDependencyWarning: ...
+ * 2.  以空格开头且包含 warnings.warn( 的后续行          例如   warnings.warn(
+ */
+const PYTHON_WARNING_RE = /^[A-Za-z]:(?:\\|\/).*?:\d+: \w+Warning: .*$/gm;
+const PYTHON_WARN_CALL_RE = /^\s+warnings\.warn\(.*$/gm;
+
+export function stripPythonWarnings(text) {
+  return String(text ?? "")
+    .replace(PYTHON_WARNING_RE, "")
+    .replace(PYTHON_WARN_CALL_RE, "")
+    .replace(/\n{3,}/g, "\n\n")   // 压缩连续空行
+    .trim();
+}
+
 function quoteShellArg(arg) {
   const value = String(arg);
   if (value === "") {

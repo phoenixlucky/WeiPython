@@ -56,12 +56,71 @@ function appendTaskOutput(task, chunk, source = "stdout") {
 
 export async function listPackages(target, preferredRoot = "") {
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
-  const result = await runCommand(pythonExecutable, ["-m", "pip", "list", "--format=json"], { timeoutMs: 15000 });
-  if (!result.ok) {
-    throw new Error(result.stderr || "获取包列表失败");
+
+  // 第 1 级：pip list --format=json（最快路径，遇损坏元数据会崩溃）
+  let result = await runCommand(pythonExecutable, ["-m", "pip", "list", "--format=json"], { timeoutMs: 15000 });
+  if (result.ok) {
+    try { return JSON.parse(result.stdout || "[]").sort((a, b) => a.name.localeCompare(b.name)); } catch {}
   }
 
-  return JSON.parse(result.stdout || "[]").sort((a, b) => a.name.localeCompare(b.name));
+  // 第 2 级：importlib.metadata 直接枚举（跳过 BadMetadata）
+  result = await runInlinePython(pythonExecutable, [
+    'import json, sys, importlib.metadata',
+    'out = []',
+    'for d in importlib.metadata.distributions():',
+    '    try:',
+    '        n = d.metadata["Name"]',
+    '        v = str(d.version) if d.version else ""',
+    '        if n: out.append({"name": n, "version": v})',
+    '    except Exception:',
+    '        pass',
+    'json.dump(out, sys.stdout)'
+  ]);
+  if (result.ok) {
+    try { return JSON.parse(result.stdout || "[]").sort((a, b) => a.name.localeCompare(b.name)); } catch {}
+  }
+
+  // 第 3 级：手动扫描 site-packages/*.dist-info/METADATA（最底层，几乎不会被破坏）
+  result = await runInlinePython(pythonExecutable, [
+    'import json, sys, os',
+    'sp = next((p for p in sys.path if p.endswith("site-packages") and os.path.isdir(p)), None)',
+    'out = []',
+    'if sp:',
+    '    for e in os.listdir(sp):',
+    '        if not e.endswith(".dist-info"): continue',
+    '        mf = os.path.join(sp, e, "METADATA")',
+    '        if not os.path.isfile(mf): continue',
+    '        try:',
+    '            with open(mf, "r", encoding="utf-8", errors="replace") as f:',
+    '                t = f.read()',
+    '            name = v = None',
+    '            for line in t.splitlines():',
+    '                if line.startswith("Name:") and name is None: name = line[5:].strip()',
+    '                elif line.startswith("Version:") and v is None: v = line[8:].strip()',
+    '                if name and v: break',
+    '            if name and v: out.append({"name": name, "version": v})',
+    '        except Exception:',
+    '            pass',
+    'json.dump(out, sys.stdout)'
+  ]);
+  if (result.ok) {
+    try { return JSON.parse(result.stdout || "[]").sort((a, b) => a.name.localeCompare(b.name)); } catch {}
+  }
+
+  // 全部回退失败 → 返回空列表而不是报错（服务端路由也兜底了，这里双重保障）
+  return [];
+}
+
+/**
+ * 用 python -c 执行一段 Python 代码并返回命令结果。
+ * 代码以多行字符串数组传入，用换行符拼接。
+ */
+async function runInlinePython(pythonExecutable, lines) {
+  try {
+    return await runCommand(pythonExecutable, ["-c", lines.join("\n")], { timeoutMs: 15000 });
+  } catch {
+    return { ok: false, stdout: "", stderr: "" };
+  }
 }
 
 export async function installPackage(target, packageName, upgrade = false, preferredRoot = "") {

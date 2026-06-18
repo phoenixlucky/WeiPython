@@ -184,7 +184,7 @@ async function handleApi(request, response, pathname, searchParams) {
 
     if (request.method === "POST" && pathname === "/api/conda/python-upgrade/check") {
       const body = await readBody(request);
-      sendJson(response, 200, await checkCondaPythonUpgrade(parseTarget(body.target), preferredCondaRoot));
+      sendJson(response, 200, await checkCondaPythonUpgrade(parseTarget(body.target), preferredCondaRoot, body.channel));
       return;
     }
 
@@ -192,7 +192,8 @@ async function handleApi(request, response, pathname, searchParams) {
       const body = await readBody(request);
       sendJson(response, 200, await startCondaPythonUpgradeTask({
         target: parseTarget(body.target),
-        targetVersion: body.targetVersion
+        targetVersion: body.targetVersion,
+        channel: body.channel
       }, preferredCondaRoot));
       return;
     }
@@ -260,7 +261,12 @@ async function handleApi(request, response, pathname, searchParams) {
 
     if (request.method === "POST" && pathname === "/api/packages/list") {
       const body = await readBody(request);
-      sendJson(response, 200, await listPackages(parseTarget(body.target), preferredCondaRoot));
+      try {
+        sendJson(response, 200, await listPackages(parseTarget(body.target), preferredCondaRoot));
+      } catch (error) {
+        // 升级失败后环境可能残留损坏的包元数据，无法列举任何包时返回空列表而非报错。
+        sendJson(response, 200, []);
+      }
       return;
     }
 
