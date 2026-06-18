@@ -383,7 +383,7 @@ async function loadSetupStatus(options = {}) {
     : miniconda.rootWritable
       ? "只更新 base 中的 Conda 核心包，不修改已有业务环境；升级前会自动备份 base 配置。"
       : "当前安装目录需要管理员权限。查看功能可用；升级时请以管理员身份运行 WeiPython。";
-  elements.upgradeMinicondaButton.disabled = !miniconda.available;
+  elements.upgradeMinicondaButton.disabled = !miniconda.available || !miniconda.rootWritable;
   elements.setupStateBadge.textContent = result.condaAvailable
     ? `已检测到 Conda · ${result.environments.length} 个环境`
     : result.platformSupported
@@ -415,30 +415,48 @@ async function upgradeMiniconda() {
     setError("未检测到 Miniconda，请先完成初始化安装。");
     return;
   }
-  const confirmed = await askConfirm({
-    title: "无损升级 Miniconda",
-    message: [
-      `当前 Conda 版本：${miniconda.condaVersion || "未知"}`,
-      `安装目录：${miniconda.rootPrefix}`,
-      `已登记环境：${miniconda.environmentCount} 个`,
-      "",
-      "升级只修改 base 环境中的 Conda 核心包。执行前将导出 base 显式配置，完成后核对所有环境路径。",
-      ...(miniconda.rootWritable ? [] : ["", "当前目录需要管理员权限；请以管理员身份运行 WeiPython 后执行。"])
-    ].join("\n"),
-    confirmText: "检查并升级"
-  });
-  if (!confirmed) return;
-
+  if (!miniconda.rootWritable) {
+    setError("Miniconda 安装目录不可写，请以管理员身份重新启动 WeiPython 后再升级。");
+    return;
+  }
   elements.upgradeMinicondaButton.disabled = true;
-  setBusy("正在检查 Miniconda 更新...");
-  showOperationModal({
-    eyebrow: "Miniconda Maintenance",
-    title: "正在检查并升级 Miniconda",
-    message: "正在读取当前版本并查询可用更新。",
-    details: "准备中...",
-    closable: false
-  });
   try {
+    setBusy("正在检查 Miniconda 更新...");
+    const check = await request("/api/setup/miniconda-upgrade-check", {
+      method: "POST",
+      timeoutMs: 60000,
+      body: JSON.stringify({ installPath: miniconda.rootPrefix })
+    });
+    if (!check.updateAvailable) {
+      setReady(`Conda ${check.currentCondaVersion} 已是最新版。`);
+      return;
+    }
+
+    const confirmed = await askConfirm({
+      title: "确认升级 Miniconda",
+      message: [
+        `当前 Conda 版本：${check.currentCondaVersion}`,
+        `可升级版本：${check.latestCondaVersion}`,
+        `安装目录：${check.installPath}`,
+        `已登记环境：${miniconda.environmentCount} 个`,
+        "",
+        "是否立即升级？升级只修改 base 环境中的 Conda 核心包；执行前将备份 base 显式配置，完成后核对全部环境路径。"
+      ].join("\n"),
+      confirmText: `升级到 ${check.latestCondaVersion}`
+    });
+    if (!confirmed) {
+      setReady("已取消 Miniconda 升级。");
+      return;
+    }
+
+    setBusy(`正在升级 Conda ${check.currentCondaVersion} → ${check.latestCondaVersion}...`);
+    showOperationModal({
+      eyebrow: "Miniconda Maintenance",
+      title: "正在升级 Miniconda",
+      message: `Conda ${check.currentCondaVersion} → ${check.latestCondaVersion}`,
+      details: "准备备份 base 配置...",
+      closable: false
+    });
     const started = await request("/api/setup/miniconda-upgrade", {
       method: "POST",
       timeoutMs: 20000,
@@ -457,7 +475,7 @@ async function upgradeMiniconda() {
       closable: true
     });
   } finally {
-    elements.upgradeMinicondaButton.disabled = !state.setup?.miniconda?.available;
+    elements.upgradeMinicondaButton.disabled = !state.setup?.miniconda?.available || !state.setup?.miniconda?.rootWritable;
   }
 }
 

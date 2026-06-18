@@ -4,7 +4,7 @@ import fsp from "node:fs/promises";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
-import { clearCondaCache, detectCondaExecutable, listCondaEnvironments, runCondaCommand } from "./environment-service.js";
+import { clearCondaCache, detectCondaExecutable, listCondaEnvironments, parseJsonCommandOutput, runCondaCommand } from "./environment-service.js";
 import { runStreamingCommand } from "../utils/process.js";
 
 const MINICONDA_WINDOWS_X64_URL = "https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe";
@@ -94,7 +94,7 @@ export function comparePythonVersions(a, b) {
 }
 
 export function resolveLatestStablePythonVersion(searchOutput) {
-  const parsed = typeof searchOutput === "string" ? JSON.parse(searchOutput || "{}") : searchOutput;
+  const parsed = typeof searchOutput === "string" ? parseJsonCommandOutput(searchOutput, {}) : searchOutput;
   const records = Array.isArray(parsed?.python) ? parsed.python : [];
   const versions = records
     .map((record) => String(record?.version || "").trim())
@@ -107,7 +107,7 @@ export function resolveLatestStablePythonVersion(searchOutput) {
 }
 
 export function resolveLatestCondaVersion(searchOutput) {
-  const parsed = typeof searchOutput === "string" ? JSON.parse(searchOutput || "{}") : searchOutput;
+  const parsed = typeof searchOutput === "string" ? parseJsonCommandOutput(searchOutput, {}) : searchOutput;
   const records = Array.isArray(parsed?.conda) ? parsed.conda : [];
   const versions = records
     .map((record) => String(record?.version || "").trim())
@@ -157,6 +157,12 @@ export async function cleanupStaleCondaUpdateArtifacts(installRoot) {
   }
 
   return { removed, failed };
+}
+
+export function buildCondaCoreUpdateArgs(targetVersion) {
+  const version = String(targetVersion || "").trim();
+  if (!/^\d+(?:\.\d+)+$/.test(version)) throw new Error("Conda 目标版本无效");
+  return ["install", "-n", "base", "-c", "defaults", `conda=${version}`, "-y"];
 }
 
 export function buildEnvironmentName(pythonVersion) {
@@ -374,7 +380,7 @@ async function getMinicondaInfo(preferredRoot) {
   }
   const result = await runCondaCommand(["info", "--json"], preferredRoot);
   if (!result.ok) throw new Error(result.stderr || result.stdout || "读取 Miniconda 信息失败");
-  const info = JSON.parse(result.stdout || "{}");
+  const info = parseJsonCommandOutput(result.stdout, {});
   const basePythonVersion = String(info.python_version || "").match(/^\d+\.\d+\.\d+/)?.[0] || info.python_version || null;
   return {
     available: true,
@@ -440,15 +446,7 @@ async function runMinicondaUpgrade(task) {
     }
 
     setStage(task, "upgrade", `正在将 Conda ${task.currentCondaVersion} 升级到 ${task.latestCondaVersion}`, 65);
-    const updateArgs = [
-      "update",
-      "-n",
-      "base",
-      "-c",
-      "defaults",
-      "conda",
-      "-y"
-    ];
+    const updateArgs = buildCondaCoreUpdateArgs(task.latestCondaVersion);
     let updateResult = await runCondaCommand(updateArgs, task.installPath);
     appendLog(task, updateResult.stdout);
     appendLog(task, updateResult.stderr ? `[stderr] ${updateResult.stderr}` : "");
@@ -478,6 +476,9 @@ async function runMinicondaUpgrade(task) {
     setStage(task, "verify", "正在校验 Conda 版本与原有环境", 90);
     clearCondaCache();
     const afterInfo = await getMinicondaInfo(task.installPath);
+    if (comparePythonVersions(afterInfo.condaVersion, task.latestCondaVersion) < 0) {
+      throw new Error(`Conda 升级命令已结束，但 base 仍为 ${afterInfo.condaVersion || "未知版本"}，未达到目标版本 ${task.latestCondaVersion}；请检查管理员权限、版本固定配置和上方求解日志`);
+    }
     const afterEnvironments = await listCondaEnvironments(task.installPath);
     const afterPathSet = new Set(afterEnvironments.environments.map((environment) =>
       process.platform === "win32" ? environment.path.toLowerCase() : environment.path
@@ -521,6 +522,28 @@ export async function getSetupStatus() {
     },
     packageCatalog: getSetupPackageCatalog(),
     requiredCondaPackages: REQUIRED_CONDA_PACKAGES
+  };
+}
+
+export async function checkMinicondaUpgrade(payload = {}) {
+  const installPath = path.resolve(String(payload.installPath || getDefaultInstallPath()).trim());
+  const current = await getMinicondaInfo(installPath);
+  if (!current.available) throw new Error("未检测到 Miniconda");
+  if (!current.rootWritable) {
+    throw new Error("Miniconda 安装目录不可写；请以管理员身份运行 WeiPython 后再检查升级");
+  }
+
+  const resolvedInstallPath = current.rootPrefix || installPath;
+  const searchResult = await runCondaCommand(["search", "-c", "defaults", "conda", "--json"], resolvedInstallPath);
+  if (!searchResult.ok) throw new Error(searchResult.stderr || searchResult.stdout || "检查 Conda 更新失败");
+  const latestCondaVersion = resolveLatestCondaVersion(searchResult.stdout);
+
+  return {
+    installPath: resolvedInstallPath,
+    currentCondaVersion: current.condaVersion,
+    latestCondaVersion,
+    updateAvailable: comparePythonVersions(current.condaVersion, latestCondaVersion) < 0,
+    rootWritable: current.rootWritable
   };
 }
 

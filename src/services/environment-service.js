@@ -6,6 +6,33 @@ import { runCommand } from "../utils/process.js";
 const IS_WINDOWS = process.platform === "win32";
 const SUPPORTED_PYTHON_VERSIONS = ["3.14", "3.13", "3.12", "3.11", "3.10", "3.9"];
 
+export function parseJsonCommandOutput(output, emptyValue = {}) {
+  const text = String(output ?? "").replace(/^\uFEFF/, "").trim();
+  if (!text) return structuredClone(emptyValue);
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Some Conda plugins incorrectly write diagnostics to stdout before/after --json output.
+  }
+
+  for (let start = 0; start < text.length; start += 1) {
+    const opening = text[start];
+    if (opening !== "{" && opening !== "[") continue;
+    const closing = opening === "{" ? "}" : "]";
+    let end = text.lastIndexOf(closing);
+    while (end > start) {
+      try {
+        return JSON.parse(text.slice(start, end + 1));
+      } catch {
+        end = text.lastIndexOf(closing, end - 1);
+      }
+    }
+  }
+
+  throw new SyntaxError(`命令输出不包含有效 JSON：${text.split("\n", 1)[0].slice(0, 200)}`);
+}
+
 // 缓存：避免每次调用 detectCondaExecutable 重复扫描 10+ 路径
 let cachedCondaExecutable = null;
 let cachedPreferredRoot = null;
@@ -353,7 +380,7 @@ export async function listCondaEnvironments(preferredRoot = "") {
     };
   }
 
-  const data = JSON.parse(result.stdout || "{}");
+  const data = parseJsonCommandOutput(result.stdout, {});
   const envDetails = data.envs_details || {};
   const environments = [...fallbackEnvironments];
 
@@ -889,7 +916,7 @@ export async function importCondaEnvironmentFromFile(payload, preferredRoot = ""
 function parseCondaSearchVersionOutput(stdout) {
   // conda search python=3.14 --json  →  { "python": [{ version:"3.14.0a5" }, ...] }
   try {
-    const data = JSON.parse(stdout);
+    const data = parseJsonCommandOutput(stdout, {});
     const entries = data.python || [];
     const versionSet = new Set();
     for (const entry of entries) {

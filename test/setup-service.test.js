@@ -3,8 +3,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { parseJsonCommandOutput } from "../src/services/environment-service.js";
 import {
   buildEnvironmentName,
+  buildCondaCoreUpdateArgs,
   cleanupStaleCondaUpdateArtifacts,
   comparePythonVersions,
   getSetupPackageCatalog,
@@ -71,6 +73,25 @@ test("recognizes the Windows Conda cleanup failure", () => {
     "AttributeError: 'str' object has no attribute 'splitext'\nD:\\Miniconda\\Scripts\\conda.exe.c~.conda_trash"
   ), true);
   assert.equal(isRecoverableCondaCleanupFailure("PackagesNotFoundError: missing"), false);
+});
+
+test("installs the requested Conda core version with an exact spec", () => {
+  assert.deepEqual(buildCondaCoreUpdateArgs("26.5.3"), [
+    "install", "-n", "base", "-c", "defaults", "conda=26.5.3", "-y"
+  ]);
+  assert.throws(() => buildCondaCoreUpdateArgs("latest"), /目标版本无效/);
+});
+
+test("parses Conda JSON when plugin diagnostics pollute stdout", () => {
+  const output = [
+    "Error loading anaconda-anon-usage: incompatible plugin",
+    '{"conda_version":"26.5.3","envs":["base"]}',
+    "plugin warning after JSON"
+  ].join("\n");
+  assert.deepEqual(parseJsonCommandOutput(output), {
+    conda_version: "26.5.3",
+    envs: ["base"]
+  });
 });
 
 test("cleans only known Conda self-update artifacts", { skip: process.platform !== "win32" }, async (context) => {

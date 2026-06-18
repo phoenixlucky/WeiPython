@@ -1,4 +1,28 @@
 # 更新日志
+## v2.7.2 - Miniconda 升级校验与确认流程增强 (2026-06-18)
+
+### 🐛 Bug 修复
+
+- ✅ 升级前先查询可用版本（`checkMinicondaUpgrade`），确认识别到新版本后再执行，避免盲目升级
+- ✅ 使用精确版本号安装 Conda 核心（`buildCondaCoreUpdateArgs`），升级后断言实际版本，防止版本跳变
+- ✅ 新增 `parseJsonCommandOutput` 健壮 JSON 解析，容忍 Conda 插件在 `--json` 输出前后写入 stdout 诊断信息，修复环境检测持续异常
+- ✅ 升级事务收尾异常时自动恢复并继续核对原有环境路径
+
+### ✨ 交互改进
+
+- ✅ 升级弹窗明确显示当前版本 → 可升级版本，用户确认后才修改 base 环境
+- ✅ 无管理员写入权限时前置阻止升级并显示明确提示
+- ✅ 前端按钮禁用状态与 `rootWritable` 联动
+
+### 🔧 技术改进
+
+- ✅ 新增 `POST /api/setup/miniconda-upgrade-check` — 检查 Conda 可用更新版本
+- ✅ 新增 `buildCondaCoreUpdateArgs(targetVersion)` — conda 核心精确版本升级参数构建
+- ✅ 新增 `parseJsonCommandOutput(output)` — 容忍 stdout 污染的 JSON 解析，供环境检测等场景复用
+- ✅ 添加精确版本升级参数与污染 stdout 解析的单测覆盖
+
+---
+
 ## v2.7.1 - Conda 更新残留文件清理 (2026-06-18)
 
 ### 🐛 Bug 修复
@@ -34,6 +58,10 @@
 - ✅ 需要管理员权限时给出明确提示，引导用户以管理员身份运行
 - ✅ 修复 Windows 上历史 `conda.exe.c~.conda_trash` 残留导致升级收尾失败的问题
 - ✅ Conda 核心已更新但临时文件清理报错时，自动清理、恢复并继续核对环境路径
+- ✅ 使用 `conda install conda=<目标版本>` 精确升级，并在完成前断言实际 base 版本已达到查询结果
+- ✅ Miniconda 目录不可写时禁用升级入口，避免将权限失败误认为升级完成
+- ✅ 容忍 Conda 插件向 stdout 写入诊断信息，避免污染 `--json` 校验结果
+- ✅ 检查到可用版本后再弹出升级确认，用户确认前不修改 base 环境
 
 ### 🔧 技术改进
 

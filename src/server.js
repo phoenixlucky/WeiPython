@@ -33,6 +33,7 @@ import {
 } from "./services/package-service.js";
 import { getSystemOverview, upgradeNodeVersion } from "./services/system-service.js";
 import {
+  checkMinicondaUpgrade,
   getSetupStatus,
   getSetupTask,
   startMinicondaUpgradeTask,
@@ -128,6 +129,11 @@ async function handleApi(request, response, pathname, searchParams) {
 
     if (request.method === "POST" && pathname === "/api/setup/miniconda-upgrade") {
       sendJson(response, 200, await startMinicondaUpgradeTask(await readBody(request)));
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/setup/miniconda-upgrade-check") {
+      sendJson(response, 200, await checkMinicondaUpgrade(await readBody(request)));
       return;
     }
 
