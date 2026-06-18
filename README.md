@@ -80,7 +80,7 @@ npm run pack
 - 软件名称：`尉Python环境管理器`
 - 软件公司：`尉缭子科技`
 - 可执行文件：`WeiPython.exe`
-- 安装包文件名：`WeiPython-Setup-2.7.2.exe`
+- 安装包文件名：`WeiPython-Setup-2.7.3.exe`
 - 默认安装目录：`D:\Program Files\WeiPython`
 - 安装模式：仅支持机器级安装，不再显示“仅为我安装”
 - GitHub 仓库：`https://github.com/phoenixlucky/WeiPython`

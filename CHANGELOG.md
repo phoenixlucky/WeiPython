@@ -1,4 +1,29 @@
 # 更新日志
+## v2.7.3 - Conda Python 无损升级 (2026-06-18)
+
+### 🚀 新增功能
+
+- ✅ 新增 Conda 环境 Python 无损升级，支持 base 与其他已登记环境
+- ✅ 可查询并选择更高的稳定 Python 版本，升级前备份、升级后校验环境路径
+- ✅ 升级前对目标环境执行 dry-run，依赖无法求解的版本不允许升级
+
+### 🐛 Bug 修复
+
+- ✅ 修复其他平台或其他渠道缓存版本被错误列为可升级版本的问题
+- ✅ 查询与安装统一使用当前平台、defaults 和 `--override-channels`
+
+### 🔧 技术改进
+
+- ✅ 新增 `src/services/python-upgrade-service.js` — Conda Python 版本升级服务模块
+- ✅ 新增 `POST /api/conda/python-upgrade/check` — 检查 Conda 环境可升级 Python 版本
+- ✅ 新增 `POST /api/conda/python-upgrade/tasks` — 启动异步 Python 升级任务
+- ✅ 新增 `GET /api/conda/python-upgrade/tasks/:id` — 轮询升级任务实时进度
+- ✅ 前端 Conda 环境面板新增「查询 Python 更新」与「无损升级 Python」按钮及版本选择器
+- ✅ Python 候选版本严格按当前平台、defaults 渠道和目标环境 dry-run 求解结果过滤
+- ✅ 添加 Conda Python 升级检查、异步任务和版本候选筛选测试
+
+---
+
 ## v2.7.2 - Miniconda 升级校验与确认流程增强 (2026-06-18)
 
 ### 🐛 Bug 修复

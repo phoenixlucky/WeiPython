@@ -10,7 +10,8 @@ const state = {
   condaChannel: "defaults",
   installedPackages: [],
   setup: null,
-  setupTask: null
+  setupTask: null,
+  pythonUpgradeCheck: null
 };
 
 const elements = {
@@ -58,6 +59,9 @@ const elements = {
   refreshInstalledPackagesButton: document.querySelector("#refreshInstalledPackagesButton"),
   upgradeNodeButton: document.querySelector("#upgradeNodeButton"),
   upgradeAllPackagesButton: document.querySelector("#upgradeAllPackagesButton"),
+  checkPythonUpgradeButton: document.querySelector("#checkPythonUpgradeButton"),
+  upgradePythonButton: document.querySelector("#upgradePythonButton"),
+  upgradePythonVersionSelect: document.querySelector("#upgradePythonVersionSelect"),
   condaMajorVersionsList: document.querySelector("#condaMajorVersionsList"),
   condaVersionDetailCard: document.querySelector("#condaVersionDetailCard"),
   condaVersionDetailTitle: document.querySelector("#condaVersionDetailTitle"),
@@ -686,6 +690,17 @@ function refreshPackageTargets() {
   elements.packageTargetSelect.innerHTML = targets
     .map((target) => `<option value='${escapeHtml(target.value)}'>${escapeHtml(target.label)}</option>`)
     .join("");
+  resetPythonUpgradeControls();
+}
+
+function resetPythonUpgradeControls() {
+  state.pythonUpgradeCheck = null;
+  const target = getSelectedTarget();
+  const isConda = target?.type === "conda";
+  elements.checkPythonUpgradeButton.disabled = !isConda;
+  elements.upgradePythonButton.disabled = true;
+  elements.upgradePythonVersionSelect.disabled = true;
+  elements.upgradePythonVersionSelect.innerHTML = `<option value="">${isConda ? "请先查询可升级版本" : "仅支持 Conda 环境"}</option>`;
 }
 
 function renderInstalledPackageOptions() {
@@ -1740,6 +1755,150 @@ async function runPackageAction(action, payload = {}) {
   setReady("包操作已完成。");
 }
 
+async function checkSelectedCondaPythonUpgrade() {
+  const target = getSelectedTarget();
+  if (target?.type !== "conda") {
+    setError("请先选择一个 Conda 环境（支持 base）。");
+    return null;
+  }
+
+  elements.checkPythonUpgradeButton.disabled = true;
+  elements.upgradePythonButton.disabled = true;
+  setBusy(`正在查询环境“${target.name}”的 Python 可升级版本...`);
+  try {
+    const result = await request("/api/conda/python-upgrade/check", {
+      method: "POST",
+      timeoutMs: 120000,
+      body: JSON.stringify({ target })
+    });
+    state.pythonUpgradeCheck = result;
+    const candidates = result.candidates || [];
+    const unavailableCandidates = result.unavailableCandidates || [];
+    elements.upgradePythonVersionSelect.innerHTML = candidates.length
+      ? candidates.map((version) => `<option value="${escapeHtml(version)}">Python ${escapeHtml(version)}</option>`).join("")
+      : `<option value="">当前没有更高的稳定版本</option>`;
+    elements.upgradePythonVersionSelect.disabled = !candidates.length;
+    elements.upgradePythonButton.disabled = !candidates.length;
+    elements.packageResults.textContent = candidates.length
+      ? [
+          `环境: ${result.target.name}`,
+          `当前 Python: ${result.currentVersion}`,
+          `推荐升级: ${result.recommendedVersion}`,
+          `可选稳定版本: ${candidates.join(", ")}`,
+          "",
+          "升级前会备份显式依赖；Conda 可能为兼容目标 Python 调整环境内的关联包。"
+        ].join("\n")
+      : unavailableCandidates.length
+        ? [
+            `环境“${result.target.name}”当前 Python ${result.currentVersion}。`,
+            `检测到更高版本 ${unavailableCandidates.join(", ")}，但 defaults 无法为当前环境完成依赖求解，因此未提供升级。`
+          ].join("\n")
+        : `环境“${result.target.name}”当前 Python ${result.currentVersion}，没有检测到更高的稳定版本。`;
+    elements.packageResultMeta.textContent = candidates.length
+      ? `${candidates.length} 个可升级版本`
+      : unavailableCandidates.length ? "无兼容升级" : "已是最新";
+    setReady(candidates.length
+      ? "Python 可升级版本已加载。"
+      : unavailableCandidates.length ? "更高版本与当前环境不兼容。" : "当前 Python 已是可用的最高稳定版本。");
+    return result;
+  } catch (error) {
+    state.pythonUpgradeCheck = null;
+    elements.upgradePythonVersionSelect.innerHTML = `<option value="">查询失败</option>`;
+    elements.upgradePythonVersionSelect.disabled = true;
+    setError(error.message);
+    throw error;
+  } finally {
+    elements.checkPythonUpgradeButton.disabled = getSelectedTarget()?.type !== "conda";
+  }
+}
+
+async function pollCondaPythonUpgradeTask(taskId) {
+  while (true) {
+    const task = await request(`/api/conda/python-upgrade/tasks/${encodeURIComponent(taskId)}`, { timeoutMs: 20000 });
+    updateOperationModal({
+      eyebrow: task.status === "running" ? "Python Upgrade" : task.status === "completed" ? "Completed" : "Failed",
+      title: task.status === "running" ? "正在无损升级 Python" : task.status === "completed" ? "Python 升级完成" : "Python 升级失败",
+      message: task.message,
+      details: task.output,
+      closable: task.status !== "running"
+    });
+    if (task.status !== "running") return task;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+}
+
+async function upgradeSelectedCondaPython() {
+  const target = getSelectedTarget();
+  const check = state.pythonUpgradeCheck;
+  const targetVersion = elements.upgradePythonVersionSelect.value;
+  if (target?.type !== "conda" || !check || !targetVersion) {
+    setError("请先查询并选择 Python 目标版本。");
+    return;
+  }
+  if (String(check.target?.path).toLowerCase() !== String(target.path).toLowerCase()) {
+    resetPythonUpgradeControls();
+    setError("目标环境已变化，请重新查询 Python 版本。");
+    return;
+  }
+
+  const confirmed = await askConfirm({
+    title: `确认升级 ${target.name} 的 Python`,
+    message: [
+      `环境：${target.name}${target.name === "base" ? "（base）" : ""}`,
+      `当前版本：Python ${check.currentVersion}`,
+      `目标版本：Python ${targetVersion}`,
+      `路径：${target.path}`,
+      "",
+      "升级将在原环境内执行。开始前会备份显式依赖，完成后核对 Python 版本及全部 Conda 环境路径；为满足兼容性，Conda 可能调整关联包。"
+    ].join("\n"),
+    confirmText: `升级到 ${targetVersion}`
+  });
+  if (!confirmed) {
+    setReady("已取消 Python 升级。");
+    return;
+  }
+
+  elements.checkPythonUpgradeButton.disabled = true;
+  elements.upgradePythonButton.disabled = true;
+  setBusy(`正在升级 ${target.name}: Python ${check.currentVersion} → ${targetVersion}...`);
+  showOperationModal({
+    eyebrow: "Python Upgrade",
+    title: "正在无损升级 Python",
+    message: `${target.name}: Python ${check.currentVersion} → ${targetVersion}`,
+    details: "正在准备环境备份...",
+    closable: false
+  });
+
+  try {
+    const started = await request("/api/conda/python-upgrade/tasks", {
+      method: "POST",
+      timeoutMs: 20000,
+      body: JSON.stringify({ target, targetVersion })
+    });
+    const completed = await pollCondaPythonUpgradeTask(started.taskId);
+    if (completed.status === "failed") throw new Error(completed.message);
+    await Promise.all([loadCondaEnvironments({ silent: true }), loadOverview()]);
+    state.pythonUpgradeCheck = null;
+    elements.packageResults.textContent = [
+      completed.message,
+      `备份文件: ${completed.backupPath || "未返回"}`,
+      `目标环境: ${completed.target.path}`
+    ].join("\n");
+    elements.packageResultMeta.textContent = "Python 升级完成";
+    setReady(completed.message);
+  } catch (error) {
+    setError(error.message);
+    updateOperationModal({
+      eyebrow: "Failed",
+      title: "Python 升级失败",
+      message: error.message,
+      closable: true
+    });
+  } finally {
+    resetPythonUpgradeControls();
+  }
+}
+
 function wireNavigation() {
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.addEventListener("click", () => {
@@ -1996,6 +2155,7 @@ function wirePackageActions() {
   const form = document.querySelector("#packageActionForm");
 
   elements.packageTargetSelect.addEventListener("change", () => {
+    resetPythonUpgradeControls();
     loadInstalledPackages({ silent: true });
   });
 
@@ -2034,6 +2194,14 @@ function wirePackageActions() {
     runPackageAction("latest-version", { packageName: form.packageName.value })
   );
   document.querySelector("#upgradePipButton").addEventListener("click", () => runPackageAction("upgrade-pip"));
+  elements.checkPythonUpgradeButton.addEventListener("click", async () => {
+    try {
+      await checkSelectedCondaPythonUpgrade();
+    } catch {
+      // The status banner and result controls already show the request error.
+    }
+  });
+  elements.upgradePythonButton.addEventListener("click", () => upgradeSelectedCondaPython());
   elements.upgradeAllPackagesButton.addEventListener("click", async () => {
     const target = getSelectedTarget();
     if (!target) {

@@ -33,6 +33,11 @@ import {
 } from "./services/package-service.js";
 import { getSystemOverview, upgradeNodeVersion } from "./services/system-service.js";
 import {
+  checkCondaPythonUpgrade,
+  getCondaPythonUpgradeTask,
+  startCondaPythonUpgradeTask
+} from "./services/python-upgrade-service.js";
+import {
   checkMinicondaUpgrade,
   getSetupStatus,
   getSetupTask,
@@ -174,6 +179,27 @@ async function handleApi(request, response, pathname, searchParams) {
 
     if (request.method === "GET" && pathname === "/api/conda/environments") {
       sendJson(response, 200, await listCondaEnvironments(preferredCondaRoot));
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/conda/python-upgrade/check") {
+      const body = await readBody(request);
+      sendJson(response, 200, await checkCondaPythonUpgrade(parseTarget(body.target), preferredCondaRoot));
+      return;
+    }
+
+    if (request.method === "POST" && pathname === "/api/conda/python-upgrade/tasks") {
+      const body = await readBody(request);
+      sendJson(response, 200, await startCondaPythonUpgradeTask({
+        target: parseTarget(body.target),
+        targetVersion: body.targetVersion
+      }, preferredCondaRoot));
+      return;
+    }
+
+    if (request.method === "GET" && pathname.startsWith("/api/conda/python-upgrade/tasks/")) {
+      const taskId = decodeURIComponent(pathname.split("/").pop());
+      sendJson(response, 200, getCondaPythonUpgradeTask(taskId));
       return;
     }
 
