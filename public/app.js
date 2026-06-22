@@ -103,6 +103,7 @@ const elements = {
 let confirmResolver = null;
 let operationProgressTimer = null;
 let runtimeBannerHideTimer = null;
+const PYTHON_UPGRADE_CHECK_TIMEOUT_MS = 300000;
 
 function clearRuntimeBannerHideTimer() {
   if (runtimeBannerHideTimer) {
@@ -1777,7 +1778,7 @@ async function checkSelectedCondaPythonUpgrade() {
     const channel = getSelectedUpgradeChannel();
     const result = await request("/api/conda/python-upgrade/check", {
       method: "POST",
-      timeoutMs: 120000,
+      timeoutMs: PYTHON_UPGRADE_CHECK_TIMEOUT_MS,
       body: JSON.stringify({ target, channel })
     });
     state.pythonUpgradeCheck = result;

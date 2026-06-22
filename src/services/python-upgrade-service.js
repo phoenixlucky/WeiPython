@@ -58,6 +58,13 @@ export function buildPythonInstallArgs(environmentPath, targetVersion, dryRun = 
   return args;
 }
 
+export function isRecoverablePythonUpgradeCleanupFailure(stderr = "", stdout = "") {
+  const output = `${stderr}\n${stdout}`;
+  return process.platform === "win32"
+    && /\.c~(?:\.conda_trash(?:_\d+)?)?/i.test(output)
+    && (/unlink_or_rename_to_trash/i.test(output) || /has no attribute ['"]splitext['"]/i.test(output));
+}
+
 export function selectPythonUpgradeCandidates(currentVersion, versions) {
   const latestByMinor = new Map();
   for (const value of versions || []) {
@@ -234,7 +241,12 @@ async function runUpgrade(task, preferredRoot) {
     );
     appendLog(task, installed.stdout);
     if (installed.stderr) appendLog(task, `[stderr] ${stripPythonWarnings(installed.stderr)}`);
-    if (!installed.ok) throw new Error(stripPythonWarnings(installed.stderr || installed.stdout) || "升级 Python 失败");
+    if (!installed.ok && !isRecoverablePythonUpgradeCleanupFailure(installed.stderr, installed.stdout)) {
+      throw new Error(stripPythonWarnings(installed.stderr || installed.stdout) || "升级 Python 失败");
+    }
+    if (!installed.ok) {
+      appendLog(task, "\n检测到 Conda 在 Windows 上仅于事务收尾时清理临时文件失败；改用实际 Python 版本判定升级结果。\n");
+    }
 
     setStage(task, "verify", "正在校验 Python 版本与全部 Conda 环境路径", 90);
     const after = await listCondaEnvironments(preferredRoot);

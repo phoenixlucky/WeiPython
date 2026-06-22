@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildPythonInstallArgs,
   extractPlatformPythonVersions,
+  isRecoverablePythonUpgradeCleanupFailure,
   selectPythonUpgradeCandidates
 } from "../src/services/python-upgrade-service.js";
 import { stripPythonWarnings } from "../src/utils/process.js";
@@ -56,6 +57,17 @@ test("falls back to defaults for unsupported channel", () => {
     "install", "-p", "/opt/conda", "--override-channels", "-c", "defaults", "python=3.13.9", "-y"
   ];
   assert.deepEqual(buildPythonInstallArgs("/opt/conda", "3.13.9", false, "bioconda"), baseArgs);
+});
+
+test("recognizes the Windows conda cleanup crash after a Python upgrade transaction", () => {
+  const output = [
+    "PermissionError: [WinError 5] Access denied: 'D:\\\\Miniconda\\\\Library\\\\bin\\\\libcrypto.dll.c~'",
+    "FileExistsError: 'libcrypto.dll.c~' -> 'libcrypto.dll.c~.conda_trash'",
+    "unlink_or_rename_to_trash(path)",
+    "AttributeError: 'str' object has no attribute 'splitext'"
+  ].join("\n");
+  assert.equal(isRecoverablePythonUpgradeCleanupFailure(output), process.platform === "win32");
+  assert.equal(isRecoverablePythonUpgradeCleanupFailure("PackagesNotFoundError: python=3.14.6"), false);
 });
 
 test("stripPythonWarnings removes Python warn() lines from conda stderr", () => {
