@@ -9,6 +9,7 @@
 - 创建、克隆、删除 Conda 环境
 - 创建、删除 `venv` 虚拟环境
 - 在不同环境中安装、升级、卸载 Python 包
+- 安装/升级时可选 pip 下载源（官方 PyPI、清华、阿里云、中科大镜像或自定义源）
 - 查看包详情、列出已安装包、从指定 requirements 文件批量安装
 - 在 Windows 上通过 `nvm-windows` 或 `winget` 升级系统 Node.js
 
@@ -88,7 +89,7 @@ npm run pack
 - 软件名称：`尉Python环境管理器`
 - 软件公司：`尉缭子科技`
 - 可执行文件：`WeiPython.exe`
-- 安装包文件名：`WeiPython-Setup-2.8.2.exe`
+- 安装包文件名：`WeiPython-Setup-2.8.4.exe`
 - 默认安装目录：`D:\Program Files\WeiPython`
 - 安装模式：仅支持机器级安装，不再显示“仅为我安装”
 - GitHub 仓库：`https://github.com/phoenixlucky/WeiPython`

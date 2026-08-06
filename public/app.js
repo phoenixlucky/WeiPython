@@ -34,6 +34,9 @@ const elements = {
   venvInventoryMeta: document.querySelector("#venvInventoryMeta"),
   packageTargetSelect: document.querySelector("#packageTargetSelect"),
   installedPackageSelect: document.querySelector("#installedPackageSelect"),
+  pipSourceSelect: document.querySelector("#pipSourceSelect"),
+  customPipSourceField: document.querySelector("#customPipSourceField"),
+  customPipSourceInput: document.querySelector("#customPipSourceInput"),
   condaSourceSelect: document.querySelector("#condaSourceSelect"),
   condaExportSourceSelect: document.querySelector("#condaExportSourceSelect"),
   condaExportAutoPathButton: document.querySelector("#condaExportAutoPathButton"),
@@ -94,12 +97,63 @@ const elements = {
 
 let confirmResolver = null;
 let operationProgressTimer = null;
+let processMonitorTimer = null;
+let processMonitorEnabled = false;
+let activeProcesses = [];
+let globalLogDetails = elements.globalLogOutput?.textContent || "尚未开始。";
 const PYTHON_UPGRADE_CHECK_TIMEOUT_MS = 300000;
 
 function scrollGlobalLogToBottom() {
   if (elements.globalLogOutput) {
     elements.globalLogOutput.scrollTop = elements.globalLogOutput.scrollHeight;
   }
+}
+
+function renderGlobalLogOutput() {
+  if (!elements.globalLogOutput) {
+    return;
+  }
+  const processLines = activeProcesses.length
+    ? [
+        "",
+        "[进程监控]",
+        ...activeProcesses.map((processInfo) =>
+          `PID ${processInfo.pid} · 已运行 ${processInfo.elapsedSeconds} 秒 · ${processInfo.command}`
+        )
+      ]
+    : [];
+  elements.globalLogOutput.textContent = `${globalLogDetails || "尚未开始。"}${processLines.join("\n")}`;
+  scrollGlobalLogToBottom();
+}
+
+async function refreshActiveProcesses() {
+  try {
+    const processes = await request("/api/processes");
+    activeProcesses = Array.isArray(processes) ? processes : [];
+    renderGlobalLogOutput();
+  } catch {
+    // 进程监控失败不影响当前操作本身。
+  }
+
+  if (!processMonitorEnabled && !activeProcesses.length && processMonitorTimer) {
+    clearInterval(processMonitorTimer);
+    processMonitorTimer = null;
+  }
+}
+
+function enableProcessMonitor() {
+  processMonitorEnabled = true;
+  if (!processMonitorTimer) {
+    processMonitorTimer = setInterval(() => {
+      void refreshActiveProcesses();
+    }, 700);
+  }
+  void refreshActiveProcesses();
+}
+
+function disableProcessMonitor() {
+  processMonitorEnabled = false;
+  void refreshActiveProcesses();
 }
 
 function setGlobalLog({ eyebrow, title, message, details } = {}) {
@@ -113,39 +167,41 @@ function setGlobalLog({ eyebrow, title, message, details } = {}) {
     elements.globalLogMessage.textContent = message || "等待操作。";
   }
   if (details !== undefined) {
-    elements.globalLogOutput.textContent = details || "尚未开始。";
-    scrollGlobalLogToBottom();
+    globalLogDetails = details || "尚未开始。";
   }
+  renderGlobalLogOutput();
 }
 
 function appendGlobalLog(message) {
   const text = String(message || "").trim();
   if (!text) return;
-  const current = elements.globalLogOutput.textContent.trim();
   const stamp = new Date().toLocaleTimeString("zh-CN", { hour12: false });
   const line = `[${stamp}] ${text}`;
-  elements.globalLogOutput.textContent = current && current !== "尚未开始。"
-    ? `${current}\n${line}`
+  globalLogDetails = globalLogDetails && globalLogDetails !== "尚未开始。"
+    ? `${globalLogDetails}\n${line}`
     : line;
-  scrollGlobalLogToBottom();
+  renderGlobalLogOutput();
 }
 
 function setBusy(message) {
   elements.statusPill.textContent = "处理中";
   setGlobalLog({ eyebrow: "处理中", message });
   appendGlobalLog(message);
+  enableProcessMonitor();
 }
 
 function setReady(message = "等待操作。") {
   elements.statusPill.textContent = "就绪";
   setGlobalLog({ eyebrow: "就绪", message });
   appendGlobalLog(message);
+  disableProcessMonitor();
 }
 
 function setError(message) {
   elements.statusPill.textContent = "异常";
   setGlobalLog({ eyebrow: "异常", message });
   appendGlobalLog(message);
+  disableProcessMonitor();
 }
 
 function escapeHtml(value) {
@@ -1416,6 +1472,22 @@ function formatTaskOutput(output, fallbackMessage = "") {
   return fallbackMessage;
 }
 
+function formatRunningTaskDetails(task) {
+  const details = formatTaskOutput(task.output, task.message);
+  if (task.status !== "running" || !task.startedAt) {
+    return details;
+  }
+
+  const startedAt = Date.parse(task.startedAt);
+  const elapsedSeconds = Number.isFinite(startedAt)
+    ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
+    : 0;
+  const processLine = task.pid
+    ? `[pip 进程] PID ${task.pid} 正在运行。`
+    : "[pip 进程] 正在启动。";
+  return `${details}\n\n${processLine}\n[进行中] 已等待 ${elapsedSeconds} 秒，正在等待 pip 返回。\n提示：如果长时间没有新输出，请切换 pip 源后重试。`;
+}
+
 function formatTargetLabel(target) {
   if (!target) {
     return "系统 Python";
@@ -1449,13 +1521,14 @@ function showResultLog(title, details, message = "操作完成。", meta = {}) {
 function previewPackageCommand(action, target, payload = {}) {
   const python = target?.path ? `"${target.path}"` : "python";
   const packageName = String(payload.packageName || "<包名>");
+  const pipSource = payload.pipIndexUrl || "https://pypi.org/simple";
   if (action === "uninstall") return `${python} -m pip uninstall ${packageName} -y`;
   if (action === "show") return `${python} -m pip show ${packageName}`;
   if (action === "list") return `${python} -m pip list --format=json`;
   if (action === "latest-version") return `GET https://pypi.org/pypi/${encodeURIComponent(packageName)}/json`;
-  if (action === "upgrade-pip") return `${python} -m pip install --upgrade pip`;
-  if (action === "upgrade-all") return `${python} -m pip list --outdated --format=json`;
-  if (action === "install-requirements") return `${python} -m pip install -r ${payload.requirementsPath || "<requirements.txt>"}`;
+  if (action === "upgrade-pip") return `${python} -m pip install --index-url ${pipSource} --upgrade pip`;
+  if (action === "upgrade-all") return `${python} -m pip list --index-url ${pipSource} --outdated --format=json`;
+  if (action === "install-requirements") return `${python} -m pip install --index-url ${pipSource} -r ${payload.requirementsPath || "<requirements.txt>"}`;
   return `${python} -m pip ${action}`;
 }
 
@@ -1467,6 +1540,11 @@ async function runInstallPackageAction(payload = {}) {
   if (!packageName) {
     setReady("请输入包名。");
     showResultLog("包操作未执行", "请输入包名后再执行该操作。", "缺少包名");
+    return;
+  }
+
+  const pipIndexUrl = readPipIndexUrl();
+  if (!pipIndexUrl) {
     return;
   }
 
@@ -1485,7 +1563,8 @@ async function runInstallPackageAction(payload = {}) {
       body: JSON.stringify({
         target,
         packageName,
-        upgrade: isUpgrade
+        upgrade: isUpgrade,
+        pipIndexUrl
       })
     });
 
@@ -1499,7 +1578,7 @@ async function runInstallPackageAction(payload = {}) {
       });
 
       updateOperationModal({
-        details: formatTaskOutput(latestTask.output, latestTask.message)
+        details: formatRunningTaskDetails(latestTask)
       });
 
       finished = latestTask.status === "completed" || latestTask.status === "failed";
@@ -1681,6 +1760,33 @@ function getSelectedTarget() {
   return JSON.parse(elements.packageTargetSelect.value);
 }
 
+function getSelectedPipIndexUrl() {
+  const selected = elements.pipSourceSelect.value;
+  return selected === "custom" ? elements.customPipSourceInput.value.trim() : selected;
+}
+
+function readPipIndexUrl() {
+  const value = getSelectedPipIndexUrl();
+  try {
+    const url = new URL(value);
+    if (!/^https?:$/u.test(url.protocol)) {
+      throw new Error("pip 源必须使用 http 或 https 地址。");
+    }
+    return url.toString();
+  } catch (error) {
+    setError(error.message || "请输入有效的 pip 源地址。");
+    return "";
+  }
+}
+
+function updatePipSourceField() {
+  const isCustom = elements.pipSourceSelect.value === "custom";
+  elements.customPipSourceField.classList.toggle("hidden", !isCustom);
+  if (isCustom) {
+    elements.customPipSourceInput.focus();
+  }
+}
+
 async function runPackageAction(action, payload = {}) {
   if (["install", "uninstall", "show", "latest-version"].includes(action) && !String(payload.packageName || "").trim()) {
     setReady("请输入包名。");
@@ -1690,6 +1796,17 @@ async function runPackageAction(action, payload = {}) {
 
   if (action === "install") {
     await runInstallPackageAction(payload);
+    return;
+  }
+
+  if (action === "upgrade-pip") {
+    await runInstallPackageAction({ packageName: "pip", upgrade: true });
+    return;
+  }
+
+  const needsPipSource = ["upgrade-all", "install-requirements"].includes(action);
+  const pipIndexUrl = needsPipSource ? readPipIndexUrl() : "";
+  if (needsPipSource && !pipIndexUrl) {
     return;
   }
 
@@ -1710,18 +1827,19 @@ async function runPackageAction(action, payload = {}) {
 
   setBusy(actionMessageMap[action] || `正在执行包操作: ${action}`);
   const target = getSelectedTarget();
+  const requestPayload = pipIndexUrl ? { ...payload, pipIndexUrl } : payload;
   setGlobalLog({
     eyebrow: "执行中",
     title: actionMessageMap[action] || `正在执行包操作: ${action}`,
     message: `目标环境: ${formatTargetLabel(target)}`,
-    details: `目标环境: ${formatTargetLabel(target)}\n执行命令:\n  ${previewPackageCommand(action, target, payload)}`
+    details: `目标环境: ${formatTargetLabel(target)}\n执行命令:\n  ${previewPackageCommand(action, target, requestPayload)}`
   });
   const data = await request(`/api/packages/${action}`, {
     method: "POST",
     timeoutMs: timeoutMap[action],
     body: JSON.stringify({
       target,
-      ...payload
+      ...requestPayload
     })
   });
 
@@ -2136,6 +2254,9 @@ function wireVenvForm() {
 
 function wirePackageActions() {
   const form = document.querySelector("#packageActionForm");
+
+  elements.pipSourceSelect.addEventListener("change", updatePipSourceField);
+  updatePipSourceField();
 
   elements.packageTargetSelect.addEventListener("change", () => {
     resetPythonUpgradeControls();

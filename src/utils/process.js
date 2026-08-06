@@ -10,6 +10,27 @@ import { exec, spawn } from "node:child_process";
  */
 const PYTHON_WARNING_RE = /^[A-Za-z]:(?:\\|\/).*?:\d+: \w+Warning: .*$/gm;
 const PYTHON_WARN_CALL_RE = /^\s+warnings\.warn\(.*$/gm;
+const activeProcesses = new Map();
+
+function trackProcess(child, commandLine) {
+  if (!child.pid) {
+    return;
+  }
+  activeProcesses.set(child.pid, {
+    pid: child.pid,
+    command: commandLine,
+    startedAt: new Date().toISOString()
+  });
+  child.once("close", () => activeProcesses.delete(child.pid));
+  child.once("error", () => activeProcesses.delete(child.pid));
+}
+
+export function getActiveProcesses() {
+  return [...activeProcesses.values()].map((processInfo) => ({
+    ...processInfo,
+    elapsedSeconds: Math.max(0, Math.floor((Date.now() - Date.parse(processInfo.startedAt)) / 1000))
+  }));
+}
 
 export function stripPythonWarnings(text) {
   return String(text ?? "")
@@ -71,6 +92,7 @@ export function runCommand(command, args = [], options = {}) {
           });
         }
       );
+      trackProcess(child, commandLine);
 
       if (options.timeoutMs) {
         setTimeout(() => {
@@ -104,6 +126,8 @@ export function runCommand(command, args = [], options = {}) {
       reject(error);
       return;
     }
+
+    trackProcess(child, commandLine);
 
     let stdout = "";
     let stderr = "";
@@ -170,6 +194,9 @@ export function runStreamingCommand(command, args = [], options = {}) {
       reject(error);
       return;
     }
+
+    trackProcess(child, commandLine);
+    options.onStart?.(child);
 
     let stdout = "";
     let stderr = "";

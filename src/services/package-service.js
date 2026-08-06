@@ -7,6 +7,25 @@ const LATEST_VERSION_CACHE_TTL_MS = 5 * 60 * 1000;
 const packageTasks = new Map();
 const PACKAGE_TASK_TTL_MS = 30 * 60 * 1000;
 const MAX_TASK_LOG_LENGTH = 120000;
+const DEFAULT_PIP_INDEX_URL = "https://pypi.org/simple";
+
+function normalizePipIndexUrl(value = "") {
+  const raw = String(value || DEFAULT_PIP_INDEX_URL).trim();
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("pip 源地址无效，请填写完整的 http/https 地址。");
+  }
+  if (!/^https?:$/u.test(url.protocol)) {
+    throw new Error("pip 源必须使用 http 或 https 地址。");
+  }
+  return url.toString();
+}
+
+function buildPipIndexArgs(pipIndexUrl) {
+  return ["--index-url", normalizePipIndexUrl(pipIndexUrl)];
+}
 
 function cleanupPackageTasks() {
   const now = Date.now();
@@ -26,6 +45,7 @@ function createPackageTaskSnapshot(task) {
     upgrade: task.upgrade,
     target: task.target,
     message: task.message,
+    pid: task.pid,
     output: task.output,
     startedAt: task.startedAt,
     finishedAt: task.finishedAt
@@ -123,9 +143,9 @@ async function runInlinePython(pythonExecutable, lines) {
   }
 }
 
-export async function installPackage(target, packageName, upgrade = false, preferredRoot = "") {
+export async function installPackage(target, packageName, upgrade = false, preferredRoot = "", pipIndexUrl = "") {
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
-  const args = ["-m", "pip", "install"];
+  const args = ["-m", "pip", "install", ...buildPipIndexArgs(pipIndexUrl)];
   if (upgrade) {
     args.push("--upgrade");
   }
@@ -141,7 +161,7 @@ export async function installPackage(target, packageName, upgrade = false, prefe
   };
 }
 
-export async function startInstallPackageTask(target, packageName, upgrade = false, preferredRoot = "") {
+export async function startInstallPackageTask(target, packageName, upgrade = false, preferredRoot = "", pipIndexUrl = "") {
   cleanupPackageTasks();
 
   const normalizedName = String(packageName || "").trim();
@@ -150,7 +170,7 @@ export async function startInstallPackageTask(target, packageName, upgrade = fal
   }
 
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
-  const args = ["-m", "pip", "install"];
+  const args = ["-m", "pip", "install", ...buildPipIndexArgs(pipIndexUrl)];
   if (upgrade) {
     args.push("--upgrade");
   }
@@ -163,6 +183,7 @@ export async function startInstallPackageTask(target, packageName, upgrade = fal
     upgrade: Boolean(upgrade),
     target,
     message: upgrade ? `正在升级包 '${normalizedName}'` : `正在安装包 '${normalizedName}'`,
+    pid: null,
     output: [
       `命令: ${pythonExecutable} ${args.join(" ")}`,
       `目标环境: ${target.type}${target.name ? ` / ${target.name}` : ""}`,
@@ -178,6 +199,10 @@ export async function startInstallPackageTask(target, packageName, upgrade = fal
     try {
       const result = await runStreamingCommand(pythonExecutable, args, {
         timeoutMs: 300000,
+        onStart: (child) => {
+          task.pid = child.pid;
+          appendTaskOutput(task, `进程 PID: ${child.pid}\n`);
+        },
         onStdout: (text) => appendTaskOutput(task, text, "stdout"),
         onStderr: (text) => appendTaskOutput(task, text, "stderr")
       });
@@ -220,10 +245,10 @@ export function getPackageTask(taskId) {
   return createPackageTaskSnapshot(task);
 }
 
-async function listOutdatedPackages(pythonExecutable) {
+async function listOutdatedPackages(pythonExecutable, pipIndexUrl = "") {
   const result = await runCommand(
     pythonExecutable,
-    ["-m", "pip", "list", "--outdated", "--format=json"],
+    ["-m", "pip", "list", ...buildPipIndexArgs(pipIndexUrl), "--outdated", "--format=json"],
     { timeoutMs: 30000 }
   );
   if (!result.ok) {
@@ -316,13 +341,13 @@ export async function getLatestPackageVersion(packageName) {
   }
 }
 
-export async function upgradePip(target, preferredRoot = "") {
-  return installPackage(target, "pip", true, preferredRoot);
+export async function upgradePip(target, preferredRoot = "", pipIndexUrl = "") {
+  return installPackage(target, "pip", true, preferredRoot, pipIndexUrl);
 }
 
-export async function upgradeAllPackages(target, preferredRoot = "") {
+export async function upgradeAllPackages(target, preferredRoot = "", pipIndexUrl = "") {
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
-  const initialOutdated = await listOutdatedPackages(pythonExecutable);
+  const initialOutdated = await listOutdatedPackages(pythonExecutable, pipIndexUrl);
   const pipOutdated = initialOutdated.packages;
   const commands = [initialOutdated.command].filter(Boolean);
   const outputs = [initialOutdated.output].filter(Boolean);
@@ -338,7 +363,7 @@ export async function upgradeAllPackages(target, preferredRoot = "") {
     condaUpdated = true;
   }
 
-  const afterCondaResult = target.type === "conda" ? await listOutdatedPackages(pythonExecutable) : null;
+  const afterCondaResult = target.type === "conda" ? await listOutdatedPackages(pythonExecutable, pipIndexUrl) : null;
   if (afterCondaResult) {
     if (afterCondaResult.command) commands.push(afterCondaResult.command);
     if (afterCondaResult.output) outputs.push(afterCondaResult.output);
@@ -349,7 +374,7 @@ export async function upgradeAllPackages(target, preferredRoot = "") {
   if (packageNames.length) {
     const upgradeResult = await runCommand(
       pythonExecutable,
-      ["-m", "pip", "install", "--upgrade", ...packageNames],
+      ["-m", "pip", "install", ...buildPipIndexArgs(pipIndexUrl), "--upgrade", ...packageNames],
       { timeoutMs: 300000 }
     );
     if (!upgradeResult.ok) {
@@ -383,9 +408,13 @@ export async function upgradeAllPackages(target, preferredRoot = "") {
   };
 }
 
-export async function installFromRequirements(target, requirementsPath, preferredRoot = "") {
+export async function installFromRequirements(target, requirementsPath, preferredRoot = "", pipIndexUrl = "") {
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
-  const result = await runCommand(pythonExecutable, ["-m", "pip", "install", "-r", requirementsPath], { timeoutMs: 120000 });
+  const result = await runCommand(
+    pythonExecutable,
+    ["-m", "pip", "install", ...buildPipIndexArgs(pipIndexUrl), "-r", requirementsPath],
+    { timeoutMs: 120000 }
+  );
   if (!result.ok) {
     throw new Error([result.command, result.stderr || "从 requirements 安装失败"].filter(Boolean).join("\n"));
   }

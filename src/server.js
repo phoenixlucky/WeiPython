@@ -32,6 +32,7 @@ import {
   upgradePip
 } from "./services/package-service.js";
 import { getSystemOverview, upgradeNodeVersion } from "./services/system-service.js";
+import { getActiveProcesses } from "./utils/process.js";
 import {
   checkCondaPythonUpgrade,
   getCondaPythonUpgradeTask,
@@ -114,6 +115,11 @@ async function handleApi(request, response, pathname, searchParams) {
   try {
     if (request.method === "GET" && pathname === "/api/health") {
       sendJson(response, 200, { ok: true });
+      return;
+    }
+
+    if (request.method === "GET" && pathname === "/api/processes") {
+      sendJson(response, 200, getActiveProcesses());
       return;
     }
 
@@ -275,7 +281,7 @@ async function handleApi(request, response, pathname, searchParams) {
       sendJson(
         response,
         200,
-        await installPackage(parseTarget(body.target), body.packageName, Boolean(body.upgrade), preferredCondaRoot)
+        await installPackage(parseTarget(body.target), body.packageName, Boolean(body.upgrade), preferredCondaRoot, body.pipIndexUrl)
       );
       return;
     }
@@ -285,7 +291,7 @@ async function handleApi(request, response, pathname, searchParams) {
       sendJson(
         response,
         200,
-        await startInstallPackageTask(parseTarget(body.target), body.packageName, Boolean(body.upgrade), preferredCondaRoot)
+        await startInstallPackageTask(parseTarget(body.target), body.packageName, Boolean(body.upgrade), preferredCondaRoot, body.pipIndexUrl)
       );
       return;
     }
@@ -316,13 +322,13 @@ async function handleApi(request, response, pathname, searchParams) {
 
     if (request.method === "POST" && pathname === "/api/packages/upgrade-pip") {
       const body = await readBody(request);
-      sendJson(response, 200, await upgradePip(parseTarget(body.target), preferredCondaRoot));
+      sendJson(response, 200, await upgradePip(parseTarget(body.target), preferredCondaRoot, body.pipIndexUrl));
       return;
     }
 
     if (request.method === "POST" && pathname === "/api/packages/upgrade-all") {
       const body = await readBody(request);
-      sendJson(response, 200, await upgradeAllPackages(parseTarget(body.target), preferredCondaRoot));
+      sendJson(response, 200, await upgradeAllPackages(parseTarget(body.target), preferredCondaRoot, body.pipIndexUrl));
       return;
     }
 
@@ -331,7 +337,7 @@ async function handleApi(request, response, pathname, searchParams) {
       sendJson(
         response,
         200,
-        await installFromRequirements(parseTarget(body.target), body.requirementsPath, preferredCondaRoot)
+        await installFromRequirements(parseTarget(body.target), body.requirementsPath, preferredCondaRoot, body.pipIndexUrl)
       );
       return;
     }
