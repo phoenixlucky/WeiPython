@@ -77,26 +77,33 @@ export async function upgradeNodeVersion() {
     throw new Error("当前仅支持在 Windows 上通过 nvm-windows 或 winget 升级系统 Node.js");
   }
 
+  const commands = [];
   const beforeResult = await runCommand("node", ["--version"], { timeoutMs: 5000 });
+  commands.push(beforeResult.command);
   const beforeVersion = beforeResult.ok ? beforeResult.stdout.trim() : "未找到";
   const nodePathResult = await runCommand("where.exe", ["node"], { timeoutMs: 5000 });
+  commands.push(nodePathResult.command);
   const nodePath = nodePathResult.ok ? nodePathResult.stdout.split(/\r?\n/u).find(Boolean) || "" : "";
   const nvmVersion = await runCommand("nvm", ["version"], { timeoutMs: 5000 });
+  commands.push(nvmVersion.command);
 
   if (nvmVersion.ok && /nvm/i.test(nodePath)) {
     const installResult = await runCommand("nvm", ["install", "latest"], { timeoutMs: 600000 });
+    commands.push(installResult.command);
     const installedVersion =
       [installResult.stdout, installResult.stderr]
         .filter(Boolean)
         .join("\n")
         .match(/\b(\d+\.\d+\.\d+)\b/u)?.[1] || "latest";
     const useResult = installResult.ok ? await runCommand("nvm", ["use", installedVersion], { timeoutMs: 120000 }) : installResult;
+    if (useResult !== installResult) commands.push(useResult.command);
     const output = [installResult.stdout, installResult.stderr, useResult.stdout, useResult.stderr].filter(Boolean).join("\n").trim();
     if (!installResult.ok || !useResult.ok) {
       throw new Error(output || "通过 nvm 升级 Node.js 失败");
     }
 
     const afterResult = await runCommand("node", ["--version"], { timeoutMs: 5000 });
+    commands.push(afterResult.command);
     const afterVersion = afterResult.ok ? afterResult.stdout.trim() : beforeVersion;
 
     return {
@@ -104,12 +111,14 @@ export async function upgradeNodeVersion() {
       beforeVersion,
       afterVersion,
       manager: "nvm-windows",
+      commands: commands.filter(Boolean),
       output,
       runtimeNote: "如果当前是 Electron 桌面版，内置运行时 Node 版本会随应用安装包更新；系统 Node.js 升级不会改变已运行进程的 Node 版本。"
     };
   }
 
   const wingetVersion = await runCommand("winget", ["--version"], { timeoutMs: 5000 });
+  commands.push(wingetVersion.command);
   if (!wingetVersion.ok) {
     throw new Error("未检测到 nvm 或 winget。请先安装 nvm-windows，或启用 Windows App Installer 后重试。");
   }
@@ -127,6 +136,7 @@ export async function upgradeNodeVersion() {
     ],
     { timeoutMs: 600000 }
   );
+  commands.push(result.command);
   let output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
   let manager = "winget upgrade";
 
@@ -144,6 +154,7 @@ export async function upgradeNodeVersion() {
       ],
       { timeoutMs: 600000 }
     );
+    commands.push(result.command);
     output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
     manager = "winget install";
   }
@@ -153,6 +164,7 @@ export async function upgradeNodeVersion() {
   }
 
   const afterResult = await runCommand("node", ["--version"], { timeoutMs: 5000 });
+  commands.push(afterResult.command);
   const afterVersion = afterResult.ok ? afterResult.stdout.trim() : beforeVersion;
 
   return {
@@ -160,6 +172,7 @@ export async function upgradeNodeVersion() {
     beforeVersion,
     afterVersion,
     manager,
+    commands: commands.filter(Boolean),
     output,
     runtimeNote: "如果当前是 Electron 桌面版，内置运行时 Node 版本会随应用安装包更新；系统 Node.js 升级不会改变已运行进程的 Node 版本。"
   };

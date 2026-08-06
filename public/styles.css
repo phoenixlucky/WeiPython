@@ -120,109 +120,6 @@ body::after {
   border-radius: 99px;
 }
 
-/* ---------- 状态栏气泡 ---------- */
-.runtime-banner {
-  position: fixed;
-  top: 18px;
-  right: 22px;
-  z-index: 1200;
-  width: min(460px, calc(100vw - 32px));
-  padding: 16px 20px;
-  border: 1px solid rgba(248, 187, 208, 0.20);
-  border-radius: var(--radius-card);
-  background: rgba(255, 251, 250, 0.35);
-  backdrop-filter: blur(24px);
-  box-shadow: var(--shadow-pink);
-  transform: translateY(0);
-  opacity: 1;
-  transition: opacity 280ms var(--ease-soft), transform 280ms var(--ease-soft), box-shadow 280ms var(--ease-soft), border-color 280ms var(--ease-soft);
-}
-
-.runtime-banner[data-state="busy"] {
-  border-color: rgba(232, 160, 191, 0.35);
-  background: rgba(255, 235, 240, 0.40);
-  backdrop-filter: blur(24px);
-  animation: bannerPulse 1.8s ease-in-out infinite;
-}
-
-.runtime-banner[data-state="error"] {
-  border-color: rgba(212, 134, 156, 0.30);
-  background: rgba(255, 240, 235, 0.40);
-  backdrop-filter: blur(24px);
-}
-
-.runtime-banner.hidden {
-  display: block;
-  opacity: 0;
-  transform: translateY(-12px);
-  pointer-events: none;
-  animation: none;
-}
-
-.runtime-banner-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.runtime-banner-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 30px;
-  padding: 0 14px;
-  border-radius: 99px;
-  background: rgba(248, 187, 208, 0.20);
-  color: var(--accent-pink);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  font-weight: 600;
-}
-
-.runtime-banner[data-state="busy"] .runtime-banner-pill {
-  background: rgba(232, 160, 191, 0.25);
-  color: var(--accent-rose);
-  animation: pillPulse 1.8s ease-in-out infinite;
-}
-
-.runtime-banner[data-state="error"] .runtime-banner-pill {
-  background: rgba(212, 134, 156, 0.18);
-  color: var(--accent-rose);
-}
-
-.runtime-banner-label {
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  font-weight: 400;
-}
-
-.runtime-banner-message {
-  margin: 10px 0 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--ink);
-}
-
-@keyframes bannerPulse {
-  0%, 100% { box-shadow: var(--shadow-pink); }
-  50% { box-shadow: 0 12px 48px rgba(232, 160, 191, 0.25); }
-}
-
-@keyframes pillPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 160, 191, 0.15); }
-  50% { box-shadow: 0 0 0 8px rgba(232, 160, 191, 0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .runtime-banner,
-  .runtime-banner[data-state="busy"],
-  .runtime-banner[data-state="busy"] .runtime-banner-pill,
-  body,
-  body::before { animation: none; transition: none; }
-}
-
 /* ---------- 表单元素 ---------- */
 button, input, select, textarea, summary {
   font: inherit;
@@ -275,20 +172,20 @@ select {
 /* ---------- 应用外壳布局 ---------- */
 .app-shell {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   min-height: 100vh;
 }
 
 /* ---------- 侧边栏 ---------- */
 .sidebar {
   position: relative;
-  padding: 24px 18px;
+  padding: 20px 14px;
   border-right: 1px solid rgba(232, 160, 191, 0.10);
   background: rgba(255, 251, 250, 0.28);
   backdrop-filter: blur(24px);
   display: grid;
   grid-template-rows: auto auto 1fr;
-  gap: 16px;
+  gap: 14px;
 }
 
 .sidebar::after {
@@ -316,15 +213,14 @@ select {
 }
 
 .sidebar-panel:hover,
-.surface-card:hover,
-.hero-card:hover {
+.surface-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-pink);
 }
 
 /* ---------- 品牌区块 ---------- */
 .brand-block {
-  padding: 24px;
+  padding: 18px 16px;
   background: linear-gradient(
     145deg,
     rgba(255, 251, 250, 0.40),
@@ -342,7 +238,7 @@ select {
   display: block;
   width: 56px;
   height: 3px;
-  margin: 0 0 18px;
+  margin: 0 0 14px;
   border-radius: 99px;
   background: linear-gradient(90deg, var(--sakura-strong), var(--accent-lavender));
 }
@@ -414,7 +310,7 @@ select {
 
 .brand-block h1 {
   margin: 0;
-  font-size: 26px;
+  font-size: 21px;
   line-height: 1.25;
   font-weight: 600;
   color: var(--ink-deep);
@@ -430,16 +326,16 @@ select {
 }
 
 .brand-copy {
-  margin: 14px 0 0;
-  line-height: 1.75;
-  font-size: 13px;
+  margin: 10px 0 0;
+  line-height: 1.65;
+  font-size: 12px;
   color: var(--muted);
   font-weight: 350;
 }
 
 /* ---------- 侧边栏导航 ---------- */
 .sidebar-title {
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   font-size: 11px;
   letter-spacing: 0.14em;
   color: var(--muted);
@@ -448,14 +344,17 @@ select {
 
 .nav-list {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   border: 1px solid rgba(232, 160, 191, 0.10);
   border-radius: var(--radius-md);
-  min-height: 44px;
-  padding: 12px 16px;
+  min-height: 38px;
+  padding: 8px 12px;
   background: rgba(255, 251, 250, 0.20);
   backdrop-filter: blur(8px);
   color: var(--ink-soft);
@@ -464,6 +363,16 @@ select {
   font-weight: 450;
   position: relative;
   transition: transform 280ms var(--ease-spring), border-color 280ms var(--ease-soft), background 280ms var(--ease-soft), box-shadow 280ms var(--ease-soft);
+}
+
+.nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  font-size: 14px;
+  line-height: 1;
+  flex: none;
 }
 
 .nav-item:hover {
@@ -483,9 +392,9 @@ select {
 .nav-item.active::before {
   content: "";
   position: absolute;
-  left: 10px;
-  top: 12px;
-  bottom: 12px;
+  left: 8px;
+  top: 8px;
+  bottom: 8px;
   width: 3px;
   border-radius: 99px;
   background: linear-gradient(180deg, var(--sakura-strong), var(--accent-lavender));
@@ -551,7 +460,7 @@ select {
 /* ---------- 侧边栏底部 ---------- */
 .sidebar-footer {
   align-self: end;
-  padding: 18px;
+  padding: 14px;
   background: rgba(255, 251, 250, 0.25);
   backdrop-filter: blur(12px);
 }
@@ -593,20 +502,84 @@ select {
 /* ---------- 主舞台 ---------- */
 .main-stage {
   min-width: 0;
-  padding: 30px;
+  padding: 24px;
   display: grid;
-  gap: 20px;
+  gap: 16px;
 }
 
-/* ---------- Hero 卡片 ---------- */
+/* ---------- 全局底部日志 ---------- */
+.global-log-panel {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+  min-width: 0;
+  padding: 18px 20px 20px;
+  border: 1px solid rgba(232, 160, 191, 0.18);
+  border-radius: var(--radius-card);
+  background: linear-gradient(145deg, rgba(255, 251, 250, 0.72), rgba(248, 187, 208, 0.12));
+  backdrop-filter: blur(24px);
+  box-shadow: 0 18px 48px rgba(74, 42, 74, 0.14);
+}
+
+.global-log-head,
+.global-log-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.global-log-head h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ink-deep);
+}
+
+.global-log-actions {
+  justify-content: flex-end;
+}
+
+.global-log-status {
+  color: var(--accent-pink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.global-log-message {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.global-log-output {
+  min-height: 120px;
+  max-height: 260px;
+  margin: 14px 0 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(232, 160, 191, 0.12);
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, rgba(45, 27, 46, 0.94), rgba(74, 42, 74, 0.90));
+  color: #F3E8FF;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-family: "Consolas", "Cascadia Code", "Microsoft YaHei", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* ---------- Hero 卡片（紧凑状态条） ---------- */
 .hero-card {
   position: relative;
   overflow: hidden;
-  padding: 28px 30px;
+  padding: 16px 24px;
   display: flex;
   justify-content: space-between;
-  gap: 24px;
-  align-items: flex-start;
+  gap: 20px;
+  align-items: center;
   background: linear-gradient(
     145deg,
     rgba(255, 251, 250, 0.35),
@@ -614,7 +587,6 @@ select {
     rgba(232, 213, 245, 0.06)
   );
   backdrop-filter: blur(20px);
-  animation: cardFloat 6s ease-in-out infinite;
 }
 
 /* Hero 左侧装饰条 — 渐变粉紫 */
@@ -652,57 +624,31 @@ select {
 
 .hero-card h2 {
   margin: 0;
-  font-size: 30px;
-  line-height: 1.2;
-  max-width: 20ch;
+  font-size: 20px;
+  line-height: 1.3;
   font-weight: 600;
   color: var(--ink-deep);
   letter-spacing: 0.01em;
 }
 
-.hero-description {
-  margin: 14px 0 0;
-  max-width: 66ch;
-  line-height: 1.75;
-  color: var(--ink-soft);
-  font-weight: 350;
-}
-
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 18px;
-}
-
-.hero-actions span {
-  min-height: 32px;
-  padding: 6px 14px;
-  border: 1px solid rgba(232, 160, 191, 0.12);
-  border-radius: 99px;
-  background: rgba(255, 251, 250, 0.30);
-  backdrop-filter: blur(8px);
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-weight: 450;
-}
-
 .hero-meta {
-  display: grid;
-  gap: 10px;
-  min-width: 200px;
+  display: flex;
+  gap: 8px;
+  flex: none;
 }
 
 .hero-meta span {
-  display: block;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 99px;
   border: 1px solid rgba(232, 160, 191, 0.10);
   background: rgba(255, 251, 250, 0.20);
   backdrop-filter: blur(8px);
   color: var(--ink-soft);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
+  white-space: nowrap;
 }
 
 /* ---------- 面板 ---------- */
@@ -723,7 +669,7 @@ select {
 
 .panel-header h3 {
   margin: 0;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--ink-deep);
   letter-spacing: 0.01em;
@@ -734,7 +680,7 @@ select {
 .dense-grid,
 .workspace-grid {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .stat-grid {
@@ -761,7 +707,7 @@ select {
 .setup-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
-  gap: 18px;
+  gap: 16px;
   align-items: start;
 }
 
@@ -830,12 +776,6 @@ select {
 
 .setup-steps li.complete {
   color: var(--ink-soft);
-}
-
-.setup-console {
-  min-height: 220px;
-  max-height: 360px;
-  overflow: auto;
 }
 
 .miniconda-maintenance-card {
@@ -943,15 +883,9 @@ select {
 /* ---------- 卡片内容 ---------- */
 .surface-card {
   min-width: 0;
-  padding: 24px;
+  padding: 20px;
   border-color: rgba(255, 255, 255, 0.25);
-  animation: cardFloat 8s ease-in-out infinite;
-  animation-delay: calc(var(--card-index, 0) * 0.3s);
 }
-
-.surface-card:nth-child(1) { --card-index: 1; }
-.surface-card:nth-child(2) { --card-index: 2; }
-.surface-card:nth-child(3) { --card-index: 3; }
 
 .accent-card {
   background: linear-gradient(
@@ -961,9 +895,7 @@ select {
   );
 }
 
-.command-card { padding: 26px; }
-
-.output-card { min-height: 100%; }
+.command-card { padding: 22px; }
 
 /* ---------- 徽章 ---------- */
 .card-badge {
@@ -1094,9 +1026,7 @@ select {
   box-shadow: var(--shadow-glow);
 }
 
-.summary-card pre,
-.console-surface,
-.operation-details {
+.summary-card pre {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1341,22 +1271,6 @@ select {
   flex: 1 1 150px;
 }
 
-/* ---------- 控制台/终端 ---------- */
-.console-surface {
-  min-height: 440px;
-  padding: 20px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(
-    145deg,
-    rgba(45, 27, 46, 0.92),
-    rgba(74, 42, 74, 0.88)
-  );
-  color: #F3E8FF;
-  border: 1px solid rgba(232, 160, 191, 0.08);
-  overflow: auto;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
 /* ---------- 通用工具类 ---------- */
 .hidden { display: none; }
 .modal-backdrop.hidden { display: none; }
@@ -1396,21 +1310,6 @@ select {
   margin: 0 0 18px;
   line-height: 1.7;
   color: var(--ink-soft);
-}
-
-.operation-card {
-  width: min(100%, 880px);
-}
-
-.operation-details {
-  margin: 0 0 18px;
-  padding: 16px 18px;
-  min-height: 240px;
-  max-height: min(56vh, 560px);
-  border-radius: var(--radius-md);
-  background: rgba(45, 27, 46, 0.04);
-  color: var(--ink);
-  overflow: auto;
 }
 
 /* ---------- 关于模态框 ---------- */
@@ -1764,15 +1663,7 @@ select {
   }
 }
 
-/* ---------- 卡片浮动主关键帧 ---------- */
-@keyframes cardFloat {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
+/* ---------- 卡片浮动主关键帧（仅 hover 用于轻微反馈，不再常驻动画） ---------- */
 
 /* ---------- 辉光脉冲 ---------- */
 @keyframes glowPulse {
@@ -1791,7 +1682,7 @@ select {
    响应式
    ============================================================ */
 
-@media (max-width: 1360px) {
+@media (max-width: 1240px) {
   .workspace-grid,
   .workspace-grid.compact-workspace,
   .workspace-grid.package-grid,
@@ -1800,9 +1691,6 @@ select {
     grid-template-columns: 1fr;
   }
 
-  .console-surface {
-    min-height: 340px;
-  }
 }
 
 @media (max-width: 760px) {
@@ -1833,10 +1721,6 @@ select {
 
   .hero-card {
     flex-direction: column;
-  }
-
-  .hero-card h2 {
-    max-width: none;
   }
 }
 
@@ -1883,13 +1767,24 @@ select {
   }
 
   .hero-card h2 {
-    font-size: 26px;
+    font-size: 19px;
   }
 
-  .runtime-banner {
-    top: 12px;
-    right: 12px;
-    left: 12px;
-    width: auto;
+  .global-log-panel {
+    bottom: 10px;
+    padding: 16px;
+  }
+
+  .global-log-head {
+    align-items: flex-start;
+  }
+
+  .global-log-actions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .global-log-output {
+    max-height: 220px;
   }
 }

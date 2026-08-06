@@ -30,11 +30,15 @@ function quoteShellArg(arg) {
   return `"${value.replace(/"/g, '\\"')}"`;
 }
 
+export function formatCommand(command, args = []) {
+  return [command, ...args].map(quoteShellArg).join(" ");
+}
+
 export function runCommand(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
+    const commandLine = formatCommand(command, args);
     if (options.shell) {
       let settled = false;
-      const commandLine = [command, ...args].map(quoteShellArg).join(" ");
       const child = exec(
         commandLine,
         {
@@ -52,7 +56,8 @@ export function runCommand(command, args = [], options = {}) {
               ok: false,
               code: error.code ?? 1,
               stdout: stdout ?? "",
-              stderr: stderr || error.message
+              stderr: stderr || error.message,
+              command: commandLine
             });
             return;
           }
@@ -61,7 +66,8 @@ export function runCommand(command, args = [], options = {}) {
             ok: true,
             code: 0,
             stdout: stdout ?? "",
-            stderr: stderr ?? ""
+            stderr: stderr ?? "",
+            command: commandLine
           });
         }
       );
@@ -77,7 +83,8 @@ export function runCommand(command, args = [], options = {}) {
             ok: false,
             code: 124,
             stdout: "",
-            stderr: `命令执行超时（>${options.timeoutMs}ms）`
+            stderr: `命令执行超时（>${options.timeoutMs}ms）`,
+            command: commandLine
           });
         }, options.timeoutMs);
       }
@@ -124,7 +131,8 @@ export function runCommand(command, args = [], options = {}) {
         ok: code === 0,
         code,
         stdout,
-        stderr
+        stderr,
+        command: commandLine
       });
     });
 
@@ -138,7 +146,8 @@ export function runCommand(command, args = [], options = {}) {
           ok: false,
           code: 124,
           stdout,
-          stderr: stderr || `命令执行超时（>${options.timeoutMs}ms）`
+          stderr: stderr || `命令执行超时（>${options.timeoutMs}ms）`,
+          command: commandLine
         });
       }, options.timeoutMs);
     }
@@ -147,6 +156,7 @@ export function runCommand(command, args = [], options = {}) {
 
 export function runStreamingCommand(command, args = [], options = {}) {
   return new Promise((resolve, reject) => {
+    const commandLine = formatCommand(command, args);
     let child;
 
     try {
@@ -201,7 +211,8 @@ export function runStreamingCommand(command, args = [], options = {}) {
         ok: code === 0,
         code,
         stdout,
-        stderr
+        stderr,
+        command: commandLine
       });
     });
 
@@ -215,7 +226,8 @@ export function runStreamingCommand(command, args = [], options = {}) {
           ok: false,
           code: 124,
           stdout,
-          stderr: stderr || `命令执行超时（>${options.timeoutMs}ms）`
+          stderr: stderr || `命令执行超时（>${options.timeoutMs}ms）`,
+          command: commandLine
         });
       }, options.timeoutMs);
     }

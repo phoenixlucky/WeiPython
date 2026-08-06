@@ -9,19 +9,21 @@
 - 创建、克隆、删除 Conda 环境
 - 创建、删除 `venv` 虚拟环境
 - 在不同环境中安装、升级、卸载 Python 包
-- 查看包详情、列出已安装包、从 `requirements.txt` 批量安装
+- 查看包详情、列出已安装包、从指定 requirements 文件批量安装
 - 在 Windows 上通过 `nvm-windows` 或 `winget` 升级系统 Node.js
 
 ## 项目结构
 
 ```text
 WeiPython/
-├── electron/                   # Electron 主进程
+├── electron/                   # Electron 主进程与预加载脚本
 ├── public/                     # 前端静态资源
 ├── src/                        # 本地 HTTP 服务与业务逻辑
+├── test/                       # Node.js 测试
+├── scripts/                    # 项目维护脚本
 ├── build/                      # 安装器图标、侧边图、NSIS 定制脚本
 ├── package.json                # npm 脚本与 electron-builder 配置
-├── requirements.txt
+├── 一键打包.bat                # Windows 交互式打包入口
 └── README.md
 ```
 
@@ -53,6 +55,12 @@ npm run desktop
 
 Electron 会先启动内置本地服务，再打开桌面窗口。
 
+### 4. 运行测试
+
+```bash
+npm test
+```
+
 ## 生成 Windows 安装包
 
 执行：
@@ -80,7 +88,7 @@ npm run pack
 - 软件名称：`尉Python环境管理器`
 - 软件公司：`尉缭子科技`
 - 可执行文件：`WeiPython.exe`
-- 安装包文件名：`WeiPython-Setup-2.7.3.exe`
+- 安装包文件名：`WeiPython-Setup-2.8.2.exe`
 - 默认安装目录：`D:\Program Files\WeiPython`
 - 安装模式：仅支持机器级安装，不再显示“仅为我安装”
 - GitHub 仓库：`https://github.com/phoenixlucky/WeiPython`
@@ -113,7 +121,7 @@ npm run pack
 1. 进入 `包管理` 页面
 2. 选择目标环境
 3. 输入包名或从已安装包下拉中选择
-4. 执行安装、升级、卸载、查询信息或从 `requirements.txt` 安装
+4. 执行安装、升级、卸载、查询信息或从指定 requirements 文件安装
 
 ### 升级 Node.js
 

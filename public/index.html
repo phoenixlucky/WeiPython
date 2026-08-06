@@ -7,19 +7,11 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="runtime-banner hidden" id="runtimeBanner" data-state="ready" aria-live="polite">
-      <div class="runtime-banner-head">
-        <span class="runtime-banner-pill" id="runtimeBannerPill">就绪</span>
-        <span class="runtime-banner-label">Runtime Status</span>
-      </div>
-      <p class="runtime-banner-message" id="runtimeBannerMessage">等待操作。</p>
-    </div>
-
     <div class="app-shell">
       <aside class="sidebar">
         <div class="sidebar-panel brand-block">
           <span class="brand-mark">WeiPython Manager</span>
-          <span class="version-chip">v2.7.3</span>
+          <span class="version-chip">v2.8.2</span>
           <p class="eyebrow">Engineering Console</p>
           <h1>尉Python 环境管理器</h1>
           <p class="brand-subtitle">Wei Python Environment Manager</p>
@@ -29,13 +21,13 @@
         <div class="sidebar-panel">
           <p class="sidebar-title">工作区</p>
           <nav class="nav-list">
-            <button class="nav-item active" data-panel="overview">概览</button>
-            <button class="nav-item" data-panel="setup">初始化配置</button>
-            <button class="nav-item" data-panel="conda">Conda</button>
-            <button class="nav-item" data-panel="conda-python">Python 版本</button>
-            <button class="nav-item" data-panel="venv">虚拟环境</button>
-            <button class="nav-item" data-panel="packages">包管理</button>
-            <button class="nav-item" id="navAboutButton" data-panel="about">关于</button>
+            <button class="nav-item active" data-panel="overview"><span class="nav-icon">🏠</span>概览</button>
+            <button class="nav-item" data-panel="setup"><span class="nav-icon">🚀</span>初始化配置</button>
+            <button class="nav-item" data-panel="conda"><span class="nav-icon">🧪</span>Conda</button>
+            <button class="nav-item" data-panel="conda-python"><span class="nav-icon">🐍</span>Python 版本</button>
+            <button class="nav-item" data-panel="venv"><span class="nav-icon">📦</span>虚拟环境</button>
+            <button class="nav-item" data-panel="packages"><span class="nav-icon">🧩</span>包管理</button>
+            <button class="nav-item" id="navAboutButton" data-panel="about"><span class="nav-icon">ℹ️</span>关于</button>
           </nav>
         </div>
 
@@ -44,7 +36,6 @@
             <div class="status-pill" id="statusPill">就绪</div>
             <span class="status-caption">Runtime Status</span>
           </div>
-          <p id="globalMessage">等待操作。</p>
         </div>
       </aside>
 
@@ -52,12 +43,7 @@
         <section class="hero-card">
           <div class="hero-copy">
             <p class="eyebrow">WeiPython Manager</p>
-            <h2>以工程控制台的方式管理 Python 环境。</h2>
-            <p class="hero-description">主任务前置，次要信息折叠。创建环境、导入导出 YAML、包维护与日志输出都集中在同一个工作台里。</p>
-            <div class="hero-actions">
-              <span>尉缭子科技</span>
-              <span>Release 2.7.3</span>
-            </div>
+            <h2>以工程控制台的方式管理 Python 环境</h2>
           </div>
           <div class="hero-meta">
             <span id="heroNodeVersion">Node</span>
@@ -191,13 +177,6 @@
                 </ol>
               </article>
 
-              <article class="surface-card output-card">
-                <div class="section-head">
-                  <h4>初始化日志</h4>
-                  <span>Console</span>
-                </div>
-                <pre class="console-surface setup-console" id="setupOutput">尚未开始。</pre>
-              </article>
             </div>
           </div>
         </section>
@@ -585,18 +564,22 @@
               </form>
             </article>
 
-            <article class="surface-card output-card">
-              <div class="card-badge-row">
-                <span class="card-badge">Live Output</span>
-                <span class="card-badge subtle" id="packageResultMeta">等待操作</span>
-              </div>
-              <div class="section-head">
-                <h4>结果输出</h4>
-                <span>Console</span>
-              </div>
-              <div id="packageResults" class="console-surface"></div>
-            </article>
           </div>
+        </section>
+
+        <section class="global-log-panel" id="globalLogPanel" aria-live="polite">
+          <div class="global-log-head">
+            <div>
+              <p class="eyebrow">Runtime Log</p>
+              <h3 id="globalLogTitle">运行日志</h3>
+            </div>
+            <div class="global-log-actions">
+              <span class="global-log-status" id="globalLogStatus">就绪</span>
+              <button class="ghost-button mini-button" type="button" id="clearGlobalLogButton">清空</button>
+            </div>
+          </div>
+          <p class="global-log-message" id="globalLogMessage">等待操作。</p>
+          <pre class="global-log-output" id="globalLogOutput">尚未开始。</pre>
         </section>
       </main>
     </div>
@@ -636,23 +619,11 @@
       <div class="petal"></div>
     </div>
 
-    <div class="modal-backdrop hidden" id="operationModal">
-      <div class="modal-card operation-card">
-        <p class="eyebrow" id="operationEyebrow">Operation</p>
-        <h3 id="operationTitle">处理中</h3>
-        <p id="operationMessage" class="modal-copy"></p>
-        <pre id="operationDetails" class="operation-details"></pre>
-        <div class="button-row">
-          <button class="ghost-button" type="button" id="operationCloseButton" disabled>关闭</button>
-        </div>
-      </div>
-    </div>
-
     <div class="modal-backdrop hidden" id="aboutModal">
       <div class="modal-card about-card">
         <div class="about-head">
           <p class="eyebrow">About</p>
-          <h3>WeiPython Manager / 尉Python 环境管理器 v2.7.3</h3>
+          <h3>WeiPython Manager / 尉Python 环境管理器 v2.8.2</h3>
           <button class="ghost-button" type="button" id="aboutCloseButton" title="关闭">✕</button>
         </div>
         <div class="about-body">
@@ -663,7 +634,7 @@
 
           <section class="about-section">
             <h4>当前版本</h4>
-            <p id="aboutVersion">v2.7.3</p>
+            <p id="aboutVersion">v2.8.2</p>
           </section>
 
           <section class="about-section">
@@ -706,7 +677,7 @@
             <h4>系统信息</h4>
             <div class="about-kv">
               <span>运行环境</span><span id="aboutPlatform">检测中...</span>
-              <span>构建版本</span><span id="aboutVersionDetail">v2.7.3</span>
+              <span>构建版本</span><span id="aboutVersionDetail">v2.8.2</span>
               <span>Node.js</span><span id="aboutNodeVersion">-</span>
               <span>Conda</span><span id="aboutCondaState">-</span>
             </div>

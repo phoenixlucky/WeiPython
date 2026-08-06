@@ -132,9 +132,13 @@ export async function installPackage(target, packageName, upgrade = false, prefe
   args.push(packageName);
   const result = await runCommand(pythonExecutable, args, { timeoutMs: 60000 });
   if (!result.ok) {
-    throw new Error(result.stderr || "安装包失败");
+    throw new Error([result.command, result.stderr || "安装包失败"].filter(Boolean).join("\n"));
   }
-  return { message: `包 '${packageName}' 安装成功` };
+  return {
+    message: `包 '${packageName}' 安装成功`,
+    command: result.command,
+    output: [result.stdout, result.stderr].filter(Boolean).join("\n").trim()
+  };
 }
 
 export async function startInstallPackageTask(target, packageName, upgrade = false, preferredRoot = "") {
@@ -223,28 +227,38 @@ async function listOutdatedPackages(pythonExecutable) {
     { timeoutMs: 30000 }
   );
   if (!result.ok) {
-    throw new Error(result.stderr || "获取可升级包列表失败");
+    throw new Error([result.command, result.stderr || "获取可升级包列表失败"].filter(Boolean).join("\n"));
   }
 
-  return JSON.parse(result.stdout || "[]");
+  return {
+    packages: JSON.parse(result.stdout || "[]"),
+    command: result.command,
+    output: result.stdout
+  };
 }
 
 export async function uninstallPackage(target, packageName, preferredRoot = "") {
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
-  const result = await runCommand(pythonExecutable, ["-m", "pip", "uninstall", packageName, "-y"], { timeoutMs: 30000 });
+  const args = ["-m", "pip", "uninstall", packageName, "-y"];
+  const result = await runCommand(pythonExecutable, args, { timeoutMs: 30000 });
   if (!result.ok) {
-    throw new Error(result.stderr || "卸载包失败");
+    throw new Error([result.command, result.stderr || "卸载包失败"].filter(Boolean).join("\n"));
   }
-  return { message: `包 '${packageName}' 卸载成功` };
+  return {
+    message: `包 '${packageName}' 卸载成功`,
+    command: result.command,
+    output: [result.stdout, result.stderr].filter(Boolean).join("\n").trim()
+  };
 }
 
 export async function showPackageInfo(target, packageName, preferredRoot = "") {
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
-  const result = await runCommand(pythonExecutable, ["-m", "pip", "show", packageName], { timeoutMs: 10000 });
+  const args = ["-m", "pip", "show", packageName];
+  const result = await runCommand(pythonExecutable, args, { timeoutMs: 10000 });
   if (!result.ok) {
-    throw new Error(result.stderr || "无法获取包信息");
+    throw new Error([result.command, result.stderr || "无法获取包信息"].filter(Boolean).join("\n"));
   }
-  return { content: result.stdout };
+  return { content: result.stdout, command: result.command };
 }
 
 export async function getLatestPackageVersion(packageName) {
@@ -284,7 +298,8 @@ export async function getLatestPackageVersion(packageName) {
       latestVersion: payload.info?.version || "unknown",
       summary: payload.info?.summary || "",
       homePage: payload.info?.home_page || payload.info?.project_url || "",
-      packageUrl: payload.info?.package_url || `https://pypi.org/project/${encodeURIComponent(normalizedName)}/`
+      packageUrl: payload.info?.package_url || `https://pypi.org/project/${encodeURIComponent(normalizedName)}/`,
+      requestUrl: `https://pypi.org/pypi/${encodeURIComponent(normalizedName)}/json`
     };
     latestVersionCache.set(cacheKey, {
       timestamp: Date.now(),
@@ -307,18 +322,28 @@ export async function upgradePip(target, preferredRoot = "") {
 
 export async function upgradeAllPackages(target, preferredRoot = "") {
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
-  const pipOutdated = await listOutdatedPackages(pythonExecutable);
+  const initialOutdated = await listOutdatedPackages(pythonExecutable);
+  const pipOutdated = initialOutdated.packages;
+  const commands = [initialOutdated.command].filter(Boolean);
+  const outputs = [initialOutdated.output].filter(Boolean);
   let condaUpdated = false;
 
   if (target.type === "conda") {
     const condaResult = await runCondaCommand(["update", "-n", target.name, "--all", "-y"], preferredRoot);
     if (!condaResult.ok) {
-      throw new Error(condaResult.stderr || condaResult.stdout || "Conda 批量升级失败");
+      throw new Error([condaResult.command, condaResult.stderr || condaResult.stdout || "Conda 批量升级失败"].filter(Boolean).join("\n"));
     }
+    if (condaResult.command) commands.push(condaResult.command);
+    if (condaResult.stdout || condaResult.stderr) outputs.push([condaResult.stdout, condaResult.stderr].filter(Boolean).join("\n"));
     condaUpdated = true;
   }
 
-  const outdatedAfterConda = target.type === "conda" ? await listOutdatedPackages(pythonExecutable) : pipOutdated;
+  const afterCondaResult = target.type === "conda" ? await listOutdatedPackages(pythonExecutable) : null;
+  if (afterCondaResult) {
+    if (afterCondaResult.command) commands.push(afterCondaResult.command);
+    if (afterCondaResult.output) outputs.push(afterCondaResult.output);
+  }
+  const outdatedAfterConda = afterCondaResult?.packages || pipOutdated;
   const packageNames = outdatedAfterConda.map((pkg) => pkg.name).filter(Boolean);
 
   if (packageNames.length) {
@@ -328,8 +353,10 @@ export async function upgradeAllPackages(target, preferredRoot = "") {
       { timeoutMs: 300000 }
     );
     if (!upgradeResult.ok) {
-      throw new Error(upgradeResult.stderr || "pip 批量升级失败");
+      throw new Error([upgradeResult.command, upgradeResult.stderr || "pip 批量升级失败"].filter(Boolean).join("\n"));
     }
+    if (upgradeResult.command) commands.push(upgradeResult.command);
+    if (upgradeResult.stdout || upgradeResult.stderr) outputs.push([upgradeResult.stdout, upgradeResult.stderr].filter(Boolean).join("\n"));
   }
 
   const upgradedNames = packageNames.join(", ");
@@ -350,7 +377,9 @@ export async function upgradeAllPackages(target, preferredRoot = "") {
     summary: summary.join("\n"),
     upgradedPackages: packageNames,
     upgradedCount: packageNames.length,
-    condaUpdated
+    condaUpdated,
+    commands,
+    output: outputs.join("\n").trim()
   };
 }
 
@@ -358,7 +387,11 @@ export async function installFromRequirements(target, requirementsPath, preferre
   const pythonExecutable = await resolvePythonExecutable(target, preferredRoot);
   const result = await runCommand(pythonExecutable, ["-m", "pip", "install", "-r", requirementsPath], { timeoutMs: 120000 });
   if (!result.ok) {
-    throw new Error(result.stderr || "从 requirements 安装失败");
+    throw new Error([result.command, result.stderr || "从 requirements 安装失败"].filter(Boolean).join("\n"));
   }
-  return { message: "从 requirements 安装成功" };
+  return {
+    message: "从 requirements 安装成功",
+    command: result.command,
+    output: [result.stdout, result.stderr].filter(Boolean).join("\n").trim()
+  };
 }

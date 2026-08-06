@@ -16,10 +16,11 @@ const state = {
 
 const elements = {
   statusPill: document.querySelector("#statusPill"),
-  globalMessage: document.querySelector("#globalMessage"),
-  runtimeBanner: document.querySelector("#runtimeBanner"),
-  runtimeBannerPill: document.querySelector("#runtimeBannerPill"),
-  runtimeBannerMessage: document.querySelector("#runtimeBannerMessage"),
+  globalLogStatus: document.querySelector("#globalLogStatus"),
+  globalLogTitle: document.querySelector("#globalLogTitle"),
+  globalLogMessage: document.querySelector("#globalLogMessage"),
+  globalLogOutput: document.querySelector("#globalLogOutput"),
+  clearGlobalLogButton: document.querySelector("#clearGlobalLogButton"),
   heroNodeVersion: document.querySelector("#heroNodeVersion"),
   heroCondaState: document.querySelector("#heroCondaState"),
   overviewStats: document.querySelector("#overviewStats"),
@@ -33,8 +34,6 @@ const elements = {
   venvInventoryMeta: document.querySelector("#venvInventoryMeta"),
   packageTargetSelect: document.querySelector("#packageTargetSelect"),
   installedPackageSelect: document.querySelector("#installedPackageSelect"),
-  packageResults: document.querySelector("#packageResults"),
-  packageResultMeta: document.querySelector("#packageResultMeta"),
   condaSourceSelect: document.querySelector("#condaSourceSelect"),
   condaExportSourceSelect: document.querySelector("#condaExportSourceSelect"),
   condaExportAutoPathButton: document.querySelector("#condaExportAutoPathButton"),
@@ -50,12 +49,6 @@ const elements = {
   confirmMessage: document.querySelector("#confirmMessage"),
   confirmCancelButton: document.querySelector("#confirmCancelButton"),
   confirmAcceptButton: document.querySelector("#confirmAcceptButton"),
-  operationModal: document.querySelector("#operationModal"),
-  operationEyebrow: document.querySelector("#operationEyebrow"),
-  operationTitle: document.querySelector("#operationTitle"),
-  operationMessage: document.querySelector("#operationMessage"),
-  operationDetails: document.querySelector("#operationDetails"),
-  operationCloseButton: document.querySelector("#operationCloseButton"),
   refreshInstalledPackagesButton: document.querySelector("#refreshInstalledPackagesButton"),
   upgradeNodeButton: document.querySelector("#upgradeNodeButton"),
   upgradeAllPackagesButton: document.querySelector("#upgradeAllPackagesButton"),
@@ -86,7 +79,6 @@ const elements = {
   setupStateBadge: document.querySelector("#setupStateBadge"),
   setupProgressText: document.querySelector("#setupProgressText"),
   setupProgressBar: document.querySelector("#setupProgressBar"),
-  setupOutput: document.querySelector("#setupOutput"),
   setupCondaPackages: document.querySelector("#setupCondaPackages"),
   setupPipPackages: document.querySelector("#setupPipPackages"),
   startSetupButton: document.querySelector("#startSetupButton"),
@@ -102,58 +94,58 @@ const elements = {
 
 let confirmResolver = null;
 let operationProgressTimer = null;
-let runtimeBannerHideTimer = null;
 const PYTHON_UPGRADE_CHECK_TIMEOUT_MS = 300000;
 
-function clearRuntimeBannerHideTimer() {
-  if (runtimeBannerHideTimer) {
-    clearTimeout(runtimeBannerHideTimer);
-    runtimeBannerHideTimer = null;
+function scrollGlobalLogToBottom() {
+  if (elements.globalLogOutput) {
+    elements.globalLogOutput.scrollTop = elements.globalLogOutput.scrollHeight;
   }
 }
 
-function hideRuntimeBanner() {
-  if (!elements.runtimeBanner) {
-    return;
+function setGlobalLog({ eyebrow, title, message, details } = {}) {
+  if (eyebrow !== undefined) {
+    elements.globalLogStatus.textContent = eyebrow;
   }
-
-  elements.runtimeBanner.classList.add("hidden");
+  if (title !== undefined) {
+    elements.globalLogTitle.textContent = title;
+  }
+  if (message !== undefined) {
+    elements.globalLogMessage.textContent = message || "等待操作。";
+  }
+  if (details !== undefined) {
+    elements.globalLogOutput.textContent = details || "尚未开始。";
+    scrollGlobalLogToBottom();
+  }
 }
 
-function setRuntimeBanner(state, title, message) {
-  if (!elements.runtimeBanner) {
-    return;
-  }
-
-  clearRuntimeBannerHideTimer();
-  elements.runtimeBanner.classList.remove("hidden");
-  elements.runtimeBanner.dataset.state = state;
-  elements.runtimeBannerPill.textContent = title;
-  elements.runtimeBannerMessage.textContent = message;
-
-  if (state !== "busy") {
-    runtimeBannerHideTimer = setTimeout(() => {
-      hideRuntimeBanner();
-    }, 3000);
-  }
+function appendGlobalLog(message) {
+  const text = String(message || "").trim();
+  if (!text) return;
+  const current = elements.globalLogOutput.textContent.trim();
+  const stamp = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+  const line = `[${stamp}] ${text}`;
+  elements.globalLogOutput.textContent = current && current !== "尚未开始。"
+    ? `${current}\n${line}`
+    : line;
+  scrollGlobalLogToBottom();
 }
 
 function setBusy(message) {
   elements.statusPill.textContent = "处理中";
-  elements.globalMessage.textContent = message;
-  setRuntimeBanner("busy", "处理中", message);
+  setGlobalLog({ eyebrow: "处理中", message });
+  appendGlobalLog(message);
 }
 
 function setReady(message = "等待操作。") {
   elements.statusPill.textContent = "就绪";
-  elements.globalMessage.textContent = message;
-  setRuntimeBanner("ready", "就绪", message);
+  setGlobalLog({ eyebrow: "就绪", message });
+  appendGlobalLog(message);
 }
 
 function setError(message) {
   elements.statusPill.textContent = "异常";
-  elements.globalMessage.textContent = message;
-  setRuntimeBanner("error", "异常", message);
+  setGlobalLog({ eyebrow: "异常", message });
+  appendGlobalLog(message);
 }
 
 function escapeHtml(value) {
@@ -185,41 +177,11 @@ function closeConfirm(result) {
 }
 
 function showOperationModal({ eyebrow = "Operation", title, message, details = "", closable = false }) {
-  elements.operationEyebrow.textContent = eyebrow;
-  elements.operationTitle.textContent = title;
-  elements.operationMessage.textContent = message;
-  elements.operationDetails.textContent = details;
-  elements.operationCloseButton.disabled = !closable;
-  elements.operationModal.classList.remove("hidden");
-}
-
-function scrollOperationDetailsToBottom() {
-  if (elements.operationDetails) {
-    elements.operationDetails.scrollTop = elements.operationDetails.scrollHeight;
-  }
+  setGlobalLog({ eyebrow, title, message, details });
 }
 
 function updateOperationModal({ eyebrow, title, message, details, closable }) {
-  if (eyebrow !== undefined) {
-    elements.operationEyebrow.textContent = eyebrow;
-  }
-  if (title !== undefined) {
-    elements.operationTitle.textContent = title;
-  }
-  if (message !== undefined) {
-    elements.operationMessage.textContent = message;
-  }
-  if (details !== undefined) {
-    elements.operationDetails.textContent = details;
-    scrollOperationDetailsToBottom();
-  }
-  if (closable !== undefined) {
-    elements.operationCloseButton.disabled = !closable;
-  }
-}
-
-function closeOperationModal() {
-  elements.operationModal.classList.add("hidden");
+  setGlobalLog({ eyebrow, title, message, details });
 }
 
 function clearOperationProgressTimer() {
@@ -357,8 +319,6 @@ function renderSetupTask(task) {
   const progress = Number(task?.progress || 0);
   elements.setupProgressText.textContent = `${progress}%`;
   elements.setupProgressBar.style.width = `${progress}%`;
-  elements.setupOutput.textContent = task?.output || "尚未开始。";
-  elements.setupOutput.scrollTop = elements.setupOutput.scrollHeight;
   elements.setupStateBadge.textContent = task?.message || "等待开始";
 
   const visualStage = task?.stage === "install" ? "download" : task?.stage || "detect";
@@ -813,7 +773,6 @@ function ensureDesktopApi(actionDescription) {
 
   const message = `当前运行环境不支持${actionDescription}，已回退为自动填充默认路径。`;
   setReady(message);
-  alert(message);
   return false;
 }
 
@@ -862,6 +821,9 @@ async function upgradeNodeVersion() {
         `升级工具: ${result.manager}`,
         `升级前: ${result.beforeVersion}`,
         `升级后: ${result.afterVersion}`,
+        "",
+        "执行命令:",
+        ...(result.commands || []).map((command) => `  ${command}`),
         "",
         result.runtimeNote,
         "",
@@ -1301,7 +1263,6 @@ async function createCondaEnvironment(event) {
     });
     await loadCondaEnvironments({ silent: true });
     renderOverview();
-    elements.globalMessage.textContent = result.message;
     setReady(result.message);
     progress.complete({
       title: "Conda 环境创建完成",
@@ -1362,7 +1323,6 @@ async function exportCondaEnvironment(event) {
       timeoutMs: 300000,
       body: JSON.stringify(payload)
     });
-    elements.globalMessage.textContent = result.message;
     setReady(result.message);
     progress.complete({
       title: "环境文件导出完成",
@@ -1428,7 +1388,6 @@ async function exportAllCondaEnvironments(event) {
       ...((result.exportedFiles || []).map((entry) => `${entry.envName}: ${entry.filePath}`))
     ].join("\n");
 
-    elements.globalMessage.textContent = result.message;
     setReady(result.message);
     progress.complete({
       title: "全部环境导出完成",
@@ -1457,6 +1416,49 @@ function formatTaskOutput(output, fallbackMessage = "") {
   return fallbackMessage;
 }
 
+function formatTargetLabel(target) {
+  if (!target) {
+    return "系统 Python";
+  }
+  return `${target.type || "system"}${target.name ? ` / ${target.name}` : ""}`;
+}
+
+function showResultLog(title, details, message = "操作完成。", meta = {}) {
+  const commands = Array.isArray(meta.commands)
+    ? meta.commands.filter(Boolean)
+    : meta.command
+      ? [meta.command]
+      : [];
+  const lines = meta.target !== undefined ? [`目标环境: ${formatTargetLabel(meta.target)}`] : [];
+  if (commands.length) {
+    lines.push("执行命令:", ...commands.map((command) => `  ${command}`));
+  }
+  if (meta.requestUrl) {
+    lines.push(`请求地址: ${meta.requestUrl}`);
+  }
+  const output = String(meta.output || "").trim();
+  if (output && output !== String(details || "").trim()) {
+    lines.push("", "命令输出:", output);
+  }
+  if (details) {
+    lines.push("", String(details));
+  }
+  setGlobalLog({ eyebrow: "结果", title, message, details: lines.join("\n") });
+}
+
+function previewPackageCommand(action, target, payload = {}) {
+  const python = target?.path ? `"${target.path}"` : "python";
+  const packageName = String(payload.packageName || "<包名>");
+  if (action === "uninstall") return `${python} -m pip uninstall ${packageName} -y`;
+  if (action === "show") return `${python} -m pip show ${packageName}`;
+  if (action === "list") return `${python} -m pip list --format=json`;
+  if (action === "latest-version") return `GET https://pypi.org/pypi/${encodeURIComponent(packageName)}/json`;
+  if (action === "upgrade-pip") return `${python} -m pip install --upgrade pip`;
+  if (action === "upgrade-all") return `${python} -m pip list --outdated --format=json`;
+  if (action === "install-requirements") return `${python} -m pip install -r ${payload.requirementsPath || "<requirements.txt>"}`;
+  return `${python} -m pip ${action}`;
+}
+
 async function runInstallPackageAction(payload = {}) {
   const target = getSelectedTarget();
   const packageName = String(payload.packageName || "").trim();
@@ -1464,8 +1466,7 @@ async function runInstallPackageAction(payload = {}) {
 
   if (!packageName) {
     setReady("请输入包名。");
-    elements.packageResults.textContent = "请输入包名后再执行该操作。";
-    elements.packageResultMeta.textContent = "缺少包名";
+    showResultLog("包操作未执行", "请输入包名后再执行该操作。", "缺少包名");
     return;
   }
 
@@ -1505,11 +1506,7 @@ async function runInstallPackageAction(payload = {}) {
     }
 
     const finalDetails = formatTaskOutput(latestTask.output, latestTask.message);
-    elements.packageResults.textContent = finalDetails;
-
     if (latestTask.status === "completed") {
-      elements.packageResultMeta.textContent = "安装完成";
-      elements.globalMessage.textContent = latestTask.message;
       setReady(latestTask.message || "包操作已完成。");
       updateOperationModal({
         eyebrow: "Completed",
@@ -1522,7 +1519,6 @@ async function runInstallPackageAction(payload = {}) {
       return;
     }
 
-    elements.packageResultMeta.textContent = "安装失败";
     setReady(latestTask.message || "包安装失败");
     updateOperationModal({
       eyebrow: "Failed",
@@ -1584,7 +1580,6 @@ async function importCondaEnvironment(event) {
     });
     await loadCondaEnvironments({ silent: true });
     renderOverview();
-    elements.globalMessage.textContent = result.message;
     setReady(result.message);
     progress.complete({
       title: "环境导入完成",
@@ -1618,7 +1613,6 @@ async function createVenv(event) {
     })
   });
   await loadVenvs();
-  elements.globalMessage.textContent = result.message;
   setReady(result.message);
 }
 
@@ -1645,7 +1639,6 @@ async function deleteConda(name) {
     const result = await request(`/api/conda/environments/${encodeURIComponent(name)}`, { method: "DELETE" });
     await loadCondaEnvironments({ silent: true });
     renderOverview();
-    elements.globalMessage.textContent = result.message;
     updateOperationModal({
       eyebrow: "Completed",
       title: "删除完成",
@@ -1678,7 +1671,6 @@ async function deleteVenv(targetPath) {
   setBusy(`正在删除虚拟环境 ${targetPath}...`);
   const result = await request(`/api/venvs?path=${encodeURIComponent(targetPath)}`, { method: "DELETE" });
   await loadVenvs();
-  elements.globalMessage.textContent = result.message;
   setReady(result.message);
 }
 
@@ -1692,8 +1684,7 @@ function getSelectedTarget() {
 async function runPackageAction(action, payload = {}) {
   if (["install", "uninstall", "show", "latest-version"].includes(action) && !String(payload.packageName || "").trim()) {
     setReady("请输入包名。");
-    elements.packageResults.textContent = "请输入包名后再执行该操作。";
-    elements.packageResultMeta.textContent = "缺少包名";
+    showResultLog("包操作未执行", "请输入包名后再执行该操作。", "缺少包名");
     return;
   }
 
@@ -1718,21 +1709,26 @@ async function runPackageAction(action, payload = {}) {
   };
 
   setBusy(actionMessageMap[action] || `正在执行包操作: ${action}`);
+  const target = getSelectedTarget();
+  setGlobalLog({
+    eyebrow: "执行中",
+    title: actionMessageMap[action] || `正在执行包操作: ${action}`,
+    message: `目标环境: ${formatTargetLabel(target)}`,
+    details: `目标环境: ${formatTargetLabel(target)}\n执行命令:\n  ${previewPackageCommand(action, target, payload)}`
+  });
   const data = await request(`/api/packages/${action}`, {
     method: "POST",
     timeoutMs: timeoutMap[action],
     body: JSON.stringify({
-      target: getSelectedTarget(),
+      target,
       ...payload
     })
   });
 
   if (action === "list") {
-    elements.packageResults.textContent = data.map((pkg) => `${pkg.name} (${pkg.version})`).join("\n");
-    elements.packageResultMeta.textContent = `${data.length} 个包`;
+    showResultLog("已安装包", data.map((pkg) => `${pkg.name} (${pkg.version})`).join("\n"), `${data.length} 个包`, { target });
   } else if (action === "show") {
-    elements.packageResults.textContent = data.content;
-    elements.packageResultMeta.textContent = "包信息";
+    showResultLog("包信息", data.content, "包信息", { ...data, target });
   } else if (action === "latest-version") {
     const installedPackage = state.installedPackages.find((pkg) => pkg.name === data.packageName);
     const lines = [
@@ -1751,15 +1747,17 @@ async function runPackageAction(action, payload = {}) {
       lines.push(`PyPI: ${data.packageUrl}`);
     }
 
-    elements.packageResults.textContent = lines.join("\n");
-    elements.packageResultMeta.textContent = "最新版本";
+    showResultLog("最新版本", lines.join("\n"), "查询完成", { ...data, target });
   } else if (action === "upgrade-all") {
-    elements.packageResults.textContent = data.summary || data.message;
-    elements.packageResultMeta.textContent = `批量升级完成${typeof data.upgradedCount === "number" ? ` · ${data.upgradedCount} 个 pip 包` : ""}`;
+    showResultLog(
+      "批量升级完成",
+      data.summary || data.message,
+      `${typeof data.upgradedCount === "number" ? `${data.upgradedCount} 个 pip 包` : "操作完成"}`,
+      { ...data, target }
+    );
     await loadInstalledPackages({ silent: true });
   } else {
-    elements.packageResults.textContent = data.message;
-    elements.packageResultMeta.textContent = "操作完成";
+    showResultLog("包操作完成", data.message, "操作完成", { ...data, target });
   }
   setReady("包操作已完成。");
 }
@@ -1789,7 +1787,7 @@ async function checkSelectedCondaPythonUpgrade() {
       : `<option value="">当前没有更高的稳定版本</option>`;
     elements.upgradePythonVersionSelect.disabled = !candidates.length;
     elements.upgradePythonButton.disabled = !candidates.length;
-    elements.packageResults.textContent = candidates.length
+    const details = candidates.length
       ? [
           `环境: ${result.target.name}`,
           `当前 Python: ${result.currentVersion}`,
@@ -1805,9 +1803,9 @@ async function checkSelectedCondaPythonUpgrade() {
             `提示：可切换到 conda-forge 源后重试。`
           ].join("\n")
         : `环境“${result.target.name}”当前 Python ${result.currentVersion}，没有检测到更高的稳定版本。`;
-    elements.packageResultMeta.textContent = candidates.length
+    showResultLog("Python 升级检查", details, candidates.length
       ? `${candidates.length} 个可升级版本`
-      : unavailableCandidates.length ? "无兼容升级" : "已是最新";
+      : unavailableCandidates.length ? "无兼容升级" : "已是最新");
     setReady(candidates.length
       ? "Python 可升级版本已加载。"
       : unavailableCandidates.length ? "更高版本与当前环境不兼容。" : "当前 Python 已是可用的最高稳定版本。");
@@ -1891,12 +1889,11 @@ async function upgradeSelectedCondaPython() {
     if (completed.status === "failed") throw new Error(completed.message);
     await Promise.all([loadCondaEnvironments({ silent: true }), loadOverview()]);
     state.pythonUpgradeCheck = null;
-    elements.packageResults.textContent = [
+    showResultLog("Python 升级完成", [
       completed.message,
       `备份文件: ${completed.backupPath || "未返回"}`,
       `目标环境: ${completed.target.path}`
-    ].join("\n");
-    elements.packageResultMeta.textContent = "Python 升级完成";
+    ].join("\n"), completed.message);
     setReady(completed.message);
   } catch (error) {
     setError(error.message);
@@ -1933,19 +1930,6 @@ function wireConfirmModal() {
   });
 }
 
-function wireOperationModal() {
-  elements.operationCloseButton.addEventListener("click", () => {
-    if (!elements.operationCloseButton.disabled) {
-      closeOperationModal();
-    }
-  });
-  elements.operationModal.addEventListener("click", (event) => {
-    if (event.target === elements.operationModal && !elements.operationCloseButton.disabled) {
-      closeOperationModal();
-    }
-  });
-}
-
 function wireCondaForm() {
   const form = document.querySelector("#condaCreateForm");
   const exportForm = document.querySelector("#condaExportForm");
@@ -1966,7 +1950,6 @@ function wireCondaForm() {
       await createCondaEnvironment(event);
     } catch (error) {
       setError(error.message);
-      alert(error.message);
     }
   });
 
@@ -1974,8 +1957,7 @@ function wireCondaForm() {
     try {
       await exportCondaEnvironment(event);
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -1983,8 +1965,7 @@ function wireCondaForm() {
     try {
       await exportAllCondaEnvironments(event);
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2003,8 +1984,7 @@ function wireCondaForm() {
         setReady(`已生成导出路径: ${filePath}`);
       }
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2027,8 +2007,7 @@ function wireCondaForm() {
         setReady("已取消选择导出文件路径。");
       }
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2039,8 +2018,7 @@ function wireCondaForm() {
         setReady(`已生成导出目录: ${directoryPath}`);
       }
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2062,8 +2040,7 @@ function wireCondaForm() {
         setReady("已取消选择导出目录。");
       }
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2071,8 +2048,7 @@ function wireCondaForm() {
     try {
       await importCondaEnvironment(event);
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2080,8 +2056,7 @@ function wireCondaForm() {
     try {
       await loadCondaEnvironments();
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2089,8 +2064,7 @@ function wireCondaForm() {
     try {
       await refreshCondaPythonVersions(state.condaSelectedMajor);
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2100,8 +2074,7 @@ function wireCondaForm() {
     if (!button) return;
     const major = button.dataset.major;
     loadCondaPythonVersions(major).catch((error) => {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     });
   });
 
@@ -2129,8 +2102,7 @@ function wireCondaForm() {
       await loadCreateFormVersions(channel);
       setReady(`Conda 版本缓存（${channel}）已刷新。`);
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2149,8 +2121,7 @@ function wireVenvForm() {
     try {
       await createVenv(event);
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2158,7 +2129,7 @@ function wireVenvForm() {
     try {
       await loadVenvs();
     } catch (error) {
-      alert(error.message);
+      setError(error.message);
     }
   });
 }
@@ -2182,8 +2153,7 @@ function wirePackageActions() {
       await Promise.all([loadCondaEnvironments({ silent: true }), loadVenvs({ silent: true }), loadOverview()]);
       await loadInstalledPackages({ silent: true });
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
 
@@ -2241,8 +2211,7 @@ function wirePackageActions() {
     try {
       await runPackageAction("upgrade-all");
     } catch (error) {
-      setReady(error.message);
-      alert(error.message);
+     setReady(error.message);
     }
   });
   document.querySelector("#installRequirementsButton").addEventListener("click", () =>
@@ -2260,7 +2229,6 @@ function wireListActions() {
         await deleteConda(condaName);
       } catch (error) {
         setReady(error.message);
-        alert(error.message);
       }
     }
 
@@ -2269,7 +2237,6 @@ function wireListActions() {
         await deleteVenv(venvPath);
       } catch (error) {
         setReady(error.message);
-        alert(error.message);
       }
     }
   });
@@ -2325,7 +2292,6 @@ function wireSetup() {
 async function bootstrap() {
   wireNavigation();
   wireConfirmModal();
-  wireOperationModal();
   wireCondaForm();
   wireVenvForm();
   wirePackageActions();
@@ -2333,11 +2299,18 @@ async function bootstrap() {
   wireAboutModal();
   wireSetup();
 
+  elements.clearGlobalLogButton.addEventListener("click", () => {
+    elements.globalLogStatus.textContent = "就绪";
+    elements.globalLogTitle.textContent = "运行日志";
+    elements.globalLogMessage.textContent = "日志已清空。";
+    elements.globalLogOutput.textContent = "尚未开始。";
+  });
+
   document.querySelector("#refreshOverviewButton").addEventListener("click", async () => {
     try {
       await loadOverview();
     } catch (error) {
-      alert(error.message);
+      setError(error.message);
     }
   });
 
@@ -2346,7 +2319,6 @@ async function bootstrap() {
       await upgradeNodeVersion();
     } catch (error) {
       setReady(error.message);
-      alert(error.message);
     }
   });
 
@@ -2358,10 +2330,9 @@ async function bootstrap() {
     // 渲染 Conda 大版本选择列表（无需远程查询）
     renderCondaMajorVersions();
     loadVenvs({ silent: true }).catch((error) => setReady(`虚拟环境扫描失败: ${error.message}`));
-  } catch (error) {
-    setReady(error.message);
-    alert(error.message);
-  }
+    } catch (error) {
+      setReady(error.message);
+    }
   // ---------- 樱花花瓣：鼠标风速感知 + 定期阵风 ----------
   const petalContainer = document.querySelector(".petal-container");
   let gusting = false;
