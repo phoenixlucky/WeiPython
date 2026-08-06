@@ -12,5 +12,14 @@ contextBridge.exposeInMainWorld("desktopAPI", {
   },
   onShowAbout(callback) {
     ipcRenderer.on("app:show-about", () => callback());
+  },
+  onRequestSkinOpen(callback) {
+    ipcRenderer.on("app:request-skin-open", () => callback());
+  },
+  onRequestWallpaperImport(callback) {
+    ipcRenderer.on("app:request-wallpaper-import", () => callback());
+  },
+  onRequestWallpaperReset(callback) {
+    ipcRenderer.on("app:request-wallpaper-reset", () => callback());
   }
 });

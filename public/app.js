@@ -92,7 +92,21 @@ const elements = {
   minicondaRootPath: document.querySelector("#minicondaRootPath"),
   minicondaEnvironmentCount: document.querySelector("#minicondaEnvironmentCount"),
   minicondaMaintenanceNote: document.querySelector("#minicondaMaintenanceNote"),
-  upgradeMinicondaButton: document.querySelector("#upgradeMinicondaButton")
+  upgradeMinicondaButton: document.querySelector("#upgradeMinicondaButton"),
+  skinButton: document.querySelector("#skinButton"),
+  skinModal: document.querySelector("#skinModal"),
+  skinCloseButton: document.querySelector("#skinCloseButton"),
+  skinImportButton: document.querySelector("#skinImportButton"),
+  skinResetButton: document.querySelector("#skinResetButton"),
+  skinFileInput: document.querySelector("#skinFileInput"),
+  skinNote: document.querySelector("#skinNote"),
+  skinPreviewInner: document.querySelector("#skinPreviewInner"),
+  skinTaglineInput: document.querySelector("#skinTaglineInput"),
+  skinTaglineResetButton: document.querySelector("#skinTaglineResetButton"),
+  skinPrimaryColor: document.querySelector("#skinPrimaryColor"),
+  skinSecondaryColor: document.querySelector("#skinSecondaryColor"),
+  skinInkColor: document.querySelector("#skinInkColor"),
+  skinColorsResetButton: document.querySelector("#skinColorsResetButton")
 };
 
 let confirmResolver = null;
@@ -2392,6 +2406,308 @@ function wireAboutModal() {
   });
 }
 
+/* ---------- 外观设置 ---------- */
+const SKIN_STORAGE_KEY = "weipython.skin";
+const LEGACY_WALLPAPER_STORAGE_KEY = "weipython.wallpaper";
+const WALLPAPER_MAX_SIDE = 2560;
+const WALLPAPER_MAX_FILE_BYTES = 20 * 1024 * 1024;
+const WALLPAPER_MAX_DATA_URL_BYTES = 4.5 * 1024 * 1024;
+
+const DEFAULT_TAGLINE = "以工程控制台的方式管理 Python 环境";
+const DEFAULT_THEME = {
+  primary: "#F48FB1",
+  secondary: "#C9A9C6",
+  ink: "#2D1B2E"
+};
+
+function getSkin() {
+  const fallback = { wallpaper: "", tagline: "", ...DEFAULT_THEME };
+  try {
+    const raw = localStorage.getItem(SKIN_STORAGE_KEY);
+    if (raw) {
+      return { ...fallback, ...JSON.parse(raw) };
+    }
+  } catch {
+    // 本地存储损坏时忽略
+  }
+  try {
+    // 迁移旧版单键壁纸设置
+    const legacy = localStorage.getItem(LEGACY_WALLPAPER_STORAGE_KEY);
+    if (legacy) {
+      localStorage.removeItem(LEGACY_WALLPAPER_STORAGE_KEY);
+      return { ...fallback, wallpaper: legacy };
+    }
+  } catch {
+    // 忽略迁移失败
+  }
+  return fallback;
+}
+
+function persistSkin(skin) {
+  try {
+    localStorage.setItem(SKIN_STORAGE_KEY, JSON.stringify(skin));
+  } catch (error) {
+    setError(`外观设置保存失败: ${error.message}`);
+  }
+}
+
+function isThemeCustom(skin) {
+  return (
+    skin.primary !== DEFAULT_THEME.primary ||
+    skin.secondary !== DEFAULT_THEME.secondary ||
+    skin.ink !== DEFAULT_THEME.ink
+  );
+}
+
+function updateSkinSummary(skin) {
+  if (elements.skinPreviewInner) {
+    elements.skinPreviewInner.style.backgroundImage = skin.wallpaper ? `url("${skin.wallpaper}")` : "";
+    elements.skinPreviewInner.textContent = skin.wallpaper ? "" : "默认壁纸";
+  }
+  if (elements.skinNote) {
+    const parts = [];
+    if (skin.wallpaper) parts.push("自定义壁纸");
+    if (skin.tagline.trim()) parts.push("自定义标语");
+    if (isThemeCustom(skin)) parts.push("自定义配色");
+    elements.skinNote.textContent = parts.length
+      ? `已应用：${parts.join("、")}，重启后仍然生效。`
+      : "当前使用默认外观。";
+  }
+}
+
+function applyWallpaper(dataUrl) {
+  if (dataUrl) {
+    document.body.style.setProperty("--wallpaper-image", `url("${dataUrl}")`);
+  } else {
+    document.body.style.removeProperty("--wallpaper-image");
+  }
+}
+
+function applyTagline(tagline) {
+  const element = document.querySelector("#heroTagline");
+  if (element) {
+    element.textContent = tagline.trim() || DEFAULT_TAGLINE;
+  }
+}
+
+/* ---------- 主题色工具 ---------- */
+function hexToRgb(hex) {
+  const value = String(hex || "").replace("#", "");
+  const full = value.length === 3 ? [...value].map((c) => c + c).join("") : value;
+  const num = parseInt(full || "0", 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+
+function mixHex(hexA, hexB, weightB) {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  const mix = (x, y) => Math.round(x + (y - x) * weightB);
+  return `#${[mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b)]
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function rgbComma(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  return `${r}, ${g}, ${b}`;
+}
+
+function buildThemeVars(theme) {
+  const primary = theme.primary;
+  const secondary = theme.secondary;
+  const ink = theme.ink;
+  return {
+    "--primary-rgb": rgbComma(mixHex(primary, "#FFFFFF", 0.60)),
+    "--accent-rgb": rgbComma(primary),
+    "--mauve-rgb": rgbComma(secondary),
+    "--sakura-pink-rgb": rgbComma(mixHex(primary, "#FFFFFF", 0.88)),
+    "--lavender-rgb": rgbComma(mixHex(secondary, "#FFFFFF", 0.80)),
+    "--peach-rgb": rgbComma(mixHex(primary, "#FFFFFF", 0.55)),
+    "--lavender-glow-rgb": rgbComma(secondary),
+    "--overlay-a-rgb": rgbComma(mixHex(primary, "#FFFFFF", 0.90)),
+    "--overlay-b-rgb": rgbComma(mixHex(secondary, "#FFFFFF", 0.90)),
+    "--overlay-c-rgb": rgbComma(mixHex(primary, "#FFFFFF", 0.95)),
+    "--ink-deep-rgb": rgbComma(ink),
+    "--ink-rgb": rgbComma(mixHex(ink, "#FFFFFF", 0.18))
+  };
+}
+
+const THEME_CSS_VARS = Object.keys(buildThemeVars(DEFAULT_THEME));
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  const vars = buildThemeVars(theme);
+  THEME_CSS_VARS.forEach((name) => root.style.setProperty(name, vars[name]));
+}
+
+function resetTheme() {
+  const root = document.documentElement;
+  THEME_CSS_VARS.forEach((name) => root.style.removeProperty(name));
+}
+
+function restoreSkin() {
+  const skin = getSkin();
+  if (skin.wallpaper) {
+    applyWallpaper(skin.wallpaper);
+  }
+  applyTagline(skin.tagline);
+  if (isThemeCustom(skin)) {
+    applyTheme(skin);
+  } else {
+    resetTheme();
+  }
+}
+
+async function compressImageFile(file) {
+  if (file.size > WALLPAPER_MAX_FILE_BYTES) {
+    throw new Error("图片过大，请选择 20MB 以内的图片。");
+  }
+  const bitmap = await createImageBitmap(file);
+  try {
+    const scale = Math.min(1, WALLPAPER_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#FFFFFF";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(bitmap, 0, 0, width, height);
+    return canvas.toDataURL("image/jpeg", 0.85);
+  } finally {
+    bitmap.close();
+  }
+}
+
+async function importWallpaperFromFile(file) {
+  try {
+    const dataUrl = await compressImageFile(file);
+    if (dataUrl.length > WALLPAPER_MAX_DATA_URL_BYTES) {
+      throw new Error("压缩后的壁纸仍然过大，请换一张分辨率或体积更小的图片。");
+    }
+    const skin = getSkin();
+    skin.wallpaper = dataUrl;
+    applyWallpaper(dataUrl);
+    persistSkin(skin);
+    updateSkinSummary(skin);
+    setReady("背景壁纸已更换。");
+    return true;
+  } catch (error) {
+    setError(error.message);
+    return false;
+  }
+}
+
+function handleWallpaperImport() {
+  elements.skinFileInput?.click();
+}
+
+function handleWallpaperReset() {
+  const skin = getSkin();
+  skin.wallpaper = "";
+  applyWallpaper("");
+  persistSkin(skin);
+  updateSkinSummary(skin);
+  setReady("已恢复默认壁纸。");
+}
+
+function handleTaglineChange() {
+  const tagline = (elements.skinTaglineInput?.value || "").trim();
+  const skin = getSkin();
+  skin.tagline = tagline;
+  applyTagline(tagline);
+  persistSkin(skin);
+  updateSkinSummary(skin);
+  setReady(tagline ? "首页标语已更新。" : "已恢复默认标语。");
+}
+
+function handleTaglineReset() {
+  if (elements.skinTaglineInput) {
+    elements.skinTaglineInput.value = "";
+  }
+  handleTaglineChange();
+}
+
+function handleColorChange() {
+  const skin = getSkin();
+  skin.primary = elements.skinPrimaryColor?.value || DEFAULT_THEME.primary;
+  skin.secondary = elements.skinSecondaryColor?.value || DEFAULT_THEME.secondary;
+  skin.ink = elements.skinInkColor?.value || DEFAULT_THEME.ink;
+  applyTheme(skin);
+  persistSkin(skin);
+  updateSkinSummary(skin);
+  setReady("整体配色已更新。");
+}
+
+function handleColorsReset() {
+  if (elements.skinPrimaryColor) elements.skinPrimaryColor.value = DEFAULT_THEME.primary;
+  if (elements.skinSecondaryColor) elements.skinSecondaryColor.value = DEFAULT_THEME.secondary;
+  if (elements.skinInkColor) elements.skinInkColor.value = DEFAULT_THEME.ink;
+  const skin = getSkin();
+  skin.primary = DEFAULT_THEME.primary;
+  skin.secondary = DEFAULT_THEME.secondary;
+  skin.ink = DEFAULT_THEME.ink;
+  resetTheme();
+  persistSkin(skin);
+  updateSkinSummary(skin);
+  setReady("已恢复默认配色。");
+}
+
+function showSkinModal() {
+  const skin = getSkin();
+  if (elements.skinTaglineInput) elements.skinTaglineInput.value = skin.tagline;
+  if (elements.skinPrimaryColor) elements.skinPrimaryColor.value = skin.primary;
+  if (elements.skinSecondaryColor) elements.skinSecondaryColor.value = skin.secondary;
+  if (elements.skinInkColor) elements.skinInkColor.value = skin.ink;
+  updateSkinSummary(skin);
+  elements.skinModal.classList.remove("hidden");
+}
+
+function wireSkin() {
+  elements.skinButton?.addEventListener("click", showSkinModal);
+  elements.skinCloseButton?.addEventListener("click", () => {
+    elements.skinModal.classList.add("hidden");
+  });
+  elements.skinModal?.addEventListener("click", (event) => {
+    if (event.target === elements.skinModal) {
+      elements.skinModal.classList.add("hidden");
+    }
+  });
+  elements.skinImportButton?.addEventListener("click", handleWallpaperImport);
+  elements.skinResetButton?.addEventListener("click", handleWallpaperReset);
+  elements.skinTaglineResetButton?.addEventListener("click", handleTaglineReset);
+  elements.skinColorsResetButton?.addEventListener("click", handleColorsReset);
+  elements.skinTaglineInput?.addEventListener("change", handleTaglineChange);
+  elements.skinPrimaryColor?.addEventListener("input", handleColorChange);
+  elements.skinSecondaryColor?.addEventListener("input", handleColorChange);
+  elements.skinInkColor?.addEventListener("input", handleColorChange);
+  elements.skinFileInput?.addEventListener("change", async () => {
+    const file = elements.skinFileInput.files?.[0];
+    elements.skinFileInput.value = "";
+    if (file) {
+      await importWallpaperFromFile(file);
+    }
+  });
+
+  // 桌面版菜单栏「设置 → 外观设置」触发的 IPC 监听
+  if (window.desktopAPI?.onRequestSkinOpen) {
+    window.desktopAPI.onRequestSkinOpen(() => {
+      showSkinModal();
+    });
+  }
+  if (window.desktopAPI?.onRequestWallpaperImport) {
+    window.desktopAPI.onRequestWallpaperImport(() => {
+      handleWallpaperImport();
+    });
+  }
+  if (window.desktopAPI?.onRequestWallpaperReset) {
+    window.desktopAPI.onRequestWallpaperReset(() => {
+      handleWallpaperReset();
+    });
+  }
+}
+
 function wireSetup() {
   elements.setupForm.addEventListener("submit", initializeComputer);
   elements.refreshSetupButton.addEventListener("click", () => {
@@ -2411,6 +2727,9 @@ function wireSetup() {
 }
 
 async function bootstrap() {
+  // 先恢复已保存的外观设置（壁纸/标语/配色），避免加载后闪烁
+  restoreSkin();
+
   wireNavigation();
   wireConfirmModal();
   wireCondaForm();
@@ -2418,6 +2737,7 @@ async function bootstrap() {
   wirePackageActions();
   wireListActions();
   wireAboutModal();
+  wireSkin();
   wireSetup();
 
   elements.clearGlobalLogButton.addEventListener("click", () => {

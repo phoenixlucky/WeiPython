@@ -11,7 +11,7 @@
       <aside class="sidebar">
         <div class="sidebar-panel brand-block">
           <span class="brand-mark">WeiPython Manager</span>
-          <span class="version-chip">v2.8.4</span>
+          <span class="version-chip">v2.8.6</span>
           <p class="eyebrow">Engineering Console</p>
           <h1>尉Python 环境管理器</h1>
           <p class="brand-subtitle">Wei Python Environment Manager</p>
@@ -36,6 +36,10 @@
             <div class="status-pill" id="statusPill">就绪</div>
             <span class="status-caption">Runtime Status</span>
           </div>
+          <button class="skin-button" id="skinButton" type="button" title="自定义背景壁纸、标语与主题颜色">
+            <span class="skin-icon">🎨</span>外观设置
+          </button>
+          <p>本地工具 · 数据不离开本机</p>
         </div>
       </aside>
 
@@ -43,7 +47,7 @@
         <section class="hero-card">
           <div class="hero-copy">
             <p class="eyebrow">WeiPython Manager</p>
-            <h2>以工程控制台的方式管理 Python 环境</h2>
+            <h2 id="heroTagline">以工程控制台的方式管理 Python 环境</h2>
           </div>
           <div class="hero-meta">
             <span id="heroNodeVersion">Node</span>
@@ -610,6 +614,58 @@
       </div>
     </div>
 
+    <div class="modal-backdrop hidden" id="skinModal">
+      <div class="modal-card skin-card">
+        <div class="skin-head">
+          <p class="eyebrow">Appearance</p>
+          <h3>外观设置</h3>
+          <button class="ghost-button" type="button" id="skinCloseButton" title="关闭">✕</button>
+        </div>
+        <p class="modal-copy">自定义应用外观：背景壁纸、首页标语与整体配色。所有设置仅保存在本机，不会上传到网络。</p>
+
+        <div class="skin-section">
+          <div class="skin-section-title">背景壁纸</div>
+          <div class="skin-preview">
+            <div class="skin-preview-inner" id="skinPreviewInner">默认壁纸</div>
+          </div>
+          <div class="skin-actions">
+            <button class="primary-button" type="button" id="skinImportButton">导入背景壁纸…</button>
+            <button class="ghost-button" type="button" id="skinResetButton">恢复默认壁纸</button>
+          </div>
+          <input type="file" id="skinFileInput" accept="image/png,image/jpeg,image/webp,image/bmp,image/gif,image/avif" hidden />
+        </div>
+
+        <div class="skin-section">
+          <div class="skin-section-title">首页标语文字</div>
+          <div class="skin-tagline-row">
+            <input type="text" id="skinTaglineInput" maxlength="60" placeholder="以工程控制台的方式管理 Python 环境" />
+            <button class="ghost-button mini-button" type="button" id="skinTaglineResetButton" title="恢复默认标语">恢复默认</button>
+          </div>
+        </div>
+
+        <div class="skin-section">
+          <div class="skin-section-title">整体配色</div>
+          <div class="skin-color-grid">
+            <label class="skin-color-field">
+              <span>主色</span>
+              <input type="color" id="skinPrimaryColor" value="#F48FB1" />
+            </label>
+            <label class="skin-color-field">
+              <span>辅助色</span>
+              <input type="color" id="skinSecondaryColor" value="#C9A9C6" />
+            </label>
+            <label class="skin-color-field">
+              <span>文字色</span>
+              <input type="color" id="skinInkColor" value="#2D1B2E" />
+            </label>
+            <button class="ghost-button mini-button" type="button" id="skinColorsResetButton">恢复默认配色</button>
+          </div>
+        </div>
+
+        <p class="skin-note" id="skinNote">当前使用默认外观。</p>
+      </div>
+    </div>
+
     <!-- 光晕装饰 -->
     <div class="glow-orb glow-orb--pink"></div>
     <div class="glow-orb glow-orb--lavender"></div>
@@ -637,7 +693,7 @@
       <div class="modal-card about-card">
         <div class="about-head">
           <p class="eyebrow">About</p>
-          <h3>WeiPython Manager / 尉Python 环境管理器 v2.8.4</h3>
+          <h3>WeiPython Manager / 尉Python 环境管理器 v2.8.6</h3>
           <button class="ghost-button" type="button" id="aboutCloseButton" title="关闭">✕</button>
         </div>
         <div class="about-body">
@@ -648,7 +704,7 @@
 
           <section class="about-section">
             <h4>当前版本</h4>
-            <p id="aboutVersion">v2.8.4</p>
+            <p id="aboutVersion">v2.8.6</p>
           </section>
 
           <section class="about-section">
@@ -691,7 +747,7 @@
             <h4>系统信息</h4>
             <div class="about-kv">
               <span>运行环境</span><span id="aboutPlatform">检测中...</span>
-              <span>构建版本</span><span id="aboutVersionDetail">v2.8.4</span>
+              <span>构建版本</span><span id="aboutVersionDetail">v2.8.6</span>
               <span>Node.js</span><span id="aboutNodeVersion">-</span>
               <span>Conda</span><span id="aboutCondaState">-</span>
             </div>

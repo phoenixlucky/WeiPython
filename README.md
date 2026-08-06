@@ -2,7 +2,7 @@
 
 > 基于 Node.js 与 Electron 的本地桌面工具，统一管理 Python、Conda、venv 与 pip 包操作。
 
-![Version](https://img.shields.io/badge/version-2.8.4-2ea44f)
+![Version](https://img.shields.io/badge/version-2.8.6-2ea44f)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078d6)
 ![Stack](https://img.shields.io/badge/stack-Node.js%20%2B%20Electron-339933)
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
@@ -22,6 +22,7 @@
 | 📦 venv | 虚拟环境创建、删除 |
 | 🧩 包管理 | 安装 / 升级 / 卸载 / 批量升级 / requirements 安装、pip 源选择 |
 | 📋 日志 | 统一运行日志面板、活跃进程监控 |
+| 🎨 外观 | 自定义背景壁纸、首页标语与整体配色 |
 
 ### 🖥️ 概览面板
 
@@ -66,6 +67,14 @@
 
 - **统一运行日志面板**：所有面板的操作输出集中展示，支持一键清空
 - **活跃进程监控**：任务运行期间实时显示子进程 PID、运行时长与命令，任务完成后自动停止轮询
+
+### 🎨 外观设置
+
+- **自定义背景壁纸**：导入本地图片作为背景（支持 png / jpeg / webp / bmp / gif / avif，≤20MB，自动压缩至最长边 2560px），或一键恢复默认壁纸
+- **首页标语文字**：自定义首页标语（最多 60 字），可恢复默认
+- **整体配色**：主色 / 辅助色 / 文字色三档颜色自由调整，可一键恢复默认配色
+- 入口：侧边栏「🎨 外观设置」按钮或菜单栏「外观设置」子菜单（打开外观设置 / 导入背景壁纸 / 恢复默认壁纸）
+- 所有外观设置仅保存在本机，数据不离开本地
 
 ---
 
@@ -120,7 +129,7 @@ Windows 下可直接运行项目根目录的 **`一键打包.bat`**，交互式�
 | 软件名称 | `尉Python环境管理器` |
 | 软件公司 | `尉缭子科技` |
 | 可执行文件 | `WeiPython.exe` |
-| 安装包文件名 | `WeiPython-Setup-2.8.4.exe` |
+| 安装包文件名 | `WeiPython-Setup-2.8.6.exe` |
 | 默认安装目录 | `D:\Program Files\WeiPython` |
 | 安装模式 | 仅机器级安装（不再显示“仅为我安装”） |
 | GitHub 仓库 | <https://github.com/phoenixlucky/WeiPython> |

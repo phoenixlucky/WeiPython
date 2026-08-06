@@ -141,6 +141,37 @@ function buildApplicationMenu() {
           click: (menuItem) => {
             void toggleAutoLaunch(menuItem);
           }
+        },
+        { type: "separator" },
+        {
+          label: "外观设置",
+          submenu: [
+            {
+              label: "打开外观设置…",
+              click: () => {
+                if (mainWindow) {
+                  mainWindow.webContents.send("app:request-skin-open");
+                }
+              }
+            },
+            { type: "separator" },
+            {
+              label: "导入背景壁纸…",
+              click: () => {
+                if (mainWindow) {
+                  mainWindow.webContents.send("app:request-wallpaper-import");
+                }
+              }
+            },
+            {
+              label: "恢复默认壁纸",
+              click: () => {
+                if (mainWindow) {
+                  mainWindow.webContents.send("app:request-wallpaper-reset");
+                }
+              }
+            }
+          ]
         }
       ]
     },
