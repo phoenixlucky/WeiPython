@@ -2,7 +2,7 @@
 
 > 基于 Node.js 与 Electron 的本地桌面工具，统一管理 Python、Conda、venv 与 pip 包操作。
 
-![Version](https://img.shields.io/badge/version-2.8.6-2ea44f)
+![Version](https://img.shields.io/badge/version-2.8.7-2ea44f)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078d6)
 ![Stack](https://img.shields.io/badge/stack-Node.js%20%2B%20Electron-339933)
 ![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
@@ -129,7 +129,7 @@ Windows 下可直接运行项目根目录的 **`一键打包.bat`**，交互式�
 | 软件名称 | `尉Python环境管理器` |
 | 软件公司 | `尉缭子科技` |
 | 可执行文件 | `WeiPython.exe` |
-| 安装包文件名 | `WeiPython-Setup-2.8.6.exe` |
+| 安装包文件名 | `WeiPython-Setup-2.8.7.exe` |
 | 默认安装目录 | `D:\Program Files\WeiPython` |
 | 安装模式 | 仅机器级安装（不再显示“仅为我安装”） |
 | GitHub 仓库 | <https://github.com/phoenixlucky/WeiPython> |
