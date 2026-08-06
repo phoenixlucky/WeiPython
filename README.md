@@ -5,6 +5,7 @@
 ![Version](https://img.shields.io/badge/version-2.8.4-2ea44f)
 ![Platform](https://img.shields.io/badge/platform-Windows-0078d6)
 ![Stack](https://img.shields.io/badge/stack-Node.js%20%2B%20Electron-339933)
+![License](https://img.shields.io/badge/License-GPLv3-blue.svg)
 
 尉Python环境管理器是一个基于 **Node.js 与 Electron** 的本地桌面工具，用来统一管理 Python、Conda、venv 与 pip 包操作。项目采用 **本地 HTTP 服务 + Electron 桌面壳** 的结构，适合在 Windows 环境下直接打包为 `exe` 安装程序。
 
@@ -133,6 +134,18 @@ WeiPython/
 ├── 一键打包.bat                # Windows 交互式打包入口
 └── README.md
 ```
+
+---
+
+## 📄 开源协议
+
+本项目基于 **GNU General Public License v3.0（GPL-3.0）** 开源发布。
+
+- Copyright (C) 2026 **尉缭子科技**
+- 许可证全文见 [LICENSE](LICENSE) 文件
+- 官方文本：<https://www.gnu.org/licenses/gpl-3.0.html>
+
+> 📌 GPL-3.0 为强 copyleft 协议：你可以自由使用、修改与分发，但分发**修改后的衍生作品**时，必须以相同协议开源并提供对应源代码。
 
 ---
 
