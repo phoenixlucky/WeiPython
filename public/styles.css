@@ -90,13 +90,15 @@ body {
 }
 
 /* 背景层 — 豆蔻少女版图片 + 柔光渐变叠加
-   --wallpaper-image 由「换皮肤」功能动态注入，缺省回退内置壁纸 */
+   --wallpaper-image 由「换皮肤」功能动态注入，缺省回退内置壁纸。
+   元素本身 fixed 定位即可固定背景，不要再加 background-attachment: fixed，
+   否则大壁纸在滚动时会强制整图重绘导致卡顿。 */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -2;
-  background: var(--wallpaper-image, url("/bg.webp")) center / cover no-repeat fixed;
+  background: var(--wallpaper-image, url("/bg.webp")) center / cover no-repeat;
   animation: bgBreath 12s ease-in-out infinite alternate;
 }
 

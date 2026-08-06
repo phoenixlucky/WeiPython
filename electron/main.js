@@ -194,6 +194,8 @@ function buildApplicationMenu() {
 }
 
 async function createMainWindow() {
+  // 将用户数据目录交给本地服务，用于持久化外观设置（随机端口下 localStorage 不跨启动保留）
+  process.env.WEIPYTHON_USER_DATA = app.getPath("userData");
   serverHandle = await startServer({ port: 0 });
 
   mainWindow = new BrowserWindow({

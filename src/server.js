@@ -52,6 +52,15 @@ const projectRoot = path.resolve(__dirname, "..");
 const publicDir = path.join(projectRoot, "public");
 const DEFAULT_PORT = Number(process.env.PORT || 3210);
 
+// 外观设置存储位置：桌面版由主进程注入 userData 目录，web 模式不支持文件持久化
+function getSkinStoragePath() {
+  const userData = process.env.WEIPYTHON_USER_DATA;
+  if (!userData) {
+    return null;
+  }
+  return path.join(userData, "skin.json");
+}
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
@@ -69,6 +78,14 @@ async function readBody(request) {
     return {};
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+// 皮肤配置写队列：串行化读-改-写，避免并发 PUT 相互覆盖
+let skinWriteQueue = Promise.resolve();
+function enqueueSkinWrite(task) {
+  const next = skinWriteQueue.then(task, task);
+  skinWriteQueue = next.catch(() => {});
+  return next;
 }
 
 async function serveStatic(response, pathname) {
@@ -114,6 +131,46 @@ async function handleApi(request, response, pathname, searchParams) {
 
   try {
     if (request.method === "GET" && pathname === "/api/health") {
+      sendJson(response, 200, { ok: true });
+      return;
+    }
+
+    if (request.method === "GET" && pathname === "/api/skin") {
+      const skinPath = getSkinStoragePath();
+      if (!skinPath) {
+        sendJson(response, 501, { error: "Not supported" });
+        return;
+      }
+      try {
+        const content = await fs.readFile(skinPath, "utf8");
+        sendJson(response, 200, JSON.parse(content));
+      } catch {
+        // 尚无持久化文件时返回空配置，由前端回退默认值
+        sendJson(response, 200, {});
+      }
+      return;
+    }
+
+    if (request.method === "PUT" && pathname === "/api/skin") {
+      const skinPath = getSkinStoragePath();
+      if (!skinPath) {
+        sendJson(response, 501, { error: "Not supported" });
+        return;
+      }
+      const body = await readBody(request);
+      // 支持局部更新：前端只提交变更字段，与已有配置合并后写回。
+      // 经写队列串行执行，防止并发 PUT 读-改-写交错覆盖。
+      await enqueueSkinWrite(async () => {
+        let existing = {};
+        try {
+          existing = JSON.parse(await fs.readFile(skinPath, "utf8"));
+        } catch {
+          // 尚无持久化文件时从空对象合并
+        }
+        const merged = { ...existing, ...body };
+        await fs.mkdir(path.dirname(skinPath), { recursive: true });
+        await fs.writeFile(skinPath, JSON.stringify(merged, null, 2), "utf8");
+      });
       sendJson(response, 200, { ok: true });
       return;
     }

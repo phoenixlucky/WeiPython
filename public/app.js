@@ -2420,7 +2420,7 @@ const DEFAULT_THEME = {
   ink: "#2D1B2E"
 };
 
-function getSkin() {
+function getSkinFallback() {
   const fallback = { wallpaper: "", tagline: "", ...DEFAULT_THEME };
   try {
     const raw = localStorage.getItem(SKIN_STORAGE_KEY);
@@ -2443,12 +2443,135 @@ function getSkin() {
   return fallback;
 }
 
-function persistSkin(skin) {
+async function loadSkinFromServer() {
   try {
-    localStorage.setItem(SKIN_STORAGE_KEY, JSON.stringify(skin));
-  } catch (error) {
-    setError(`外观设置保存失败: ${error.message}`);
+    const response = await fetch("/api/skin", { cache: "no-store" });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch {
+    // 服务端不可用时回退本地存储
   }
+  return null;
+}
+
+async function saveSkinToServer(skin) {
+  try {
+    const response = await fetch("/api/skin", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(skin)
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function getSkin() {
+  // 桌面版：以 userData/skin.json 文件为准（随机端口下 localStorage 无法跨启动保留）
+  const serverSkin = await loadSkinFromServer();
+  const fallback = getSkinFallback();
+  const base =
+    serverSkin && typeof serverSkin === "object"
+      ? { ...fallback, ...serverSkin }
+      : fallback;
+
+  // localStorage 可能是上次保存失败时的最新兜底数据，优先于 server 文件采用
+  let hasLocalFallback = false;
+  try {
+    const localRaw = localStorage.getItem(SKIN_STORAGE_KEY);
+    if (localRaw) {
+      const local = JSON.parse(localRaw);
+      if (local && typeof local === "object") {
+        Object.assign(base, local);
+        hasLocalFallback = true;
+      }
+    }
+  } catch {
+    // 本地存储损坏时忽略
+  }
+
+  // 清洗旧数据：保证关键字段为可用值
+  base.wallpaper = typeof base.wallpaper === "string" ? base.wallpaper : "";
+  base.tagline = typeof base.tagline === "string" ? base.tagline : "";
+  base.primary = typeof base.primary === "string" && base.primary ? base.primary : DEFAULT_THEME.primary;
+  base.secondary = typeof base.secondary === "string" && base.secondary ? base.secondary : DEFAULT_THEME.secondary;
+  base.ink = typeof base.ink === "string" && base.ink ? base.ink : DEFAULT_THEME.ink;
+
+  // 本地兜底比 server 新：写回文件保持一致，成功后再清除本地
+  if (hasLocalFallback) {
+    const synced = await saveSkinToServer(base);
+    if (synced) {
+      try {
+        localStorage.removeItem(SKIN_STORAGE_KEY);
+      } catch {
+        // 忽略清除失败
+      }
+    }
+  }
+  return base;
+}
+
+let cachedSkin = null;
+let lastSavedSkin = null;
+
+async function ensureSkinLoaded() {
+  if (!cachedSkin) {
+    cachedSkin = await getSkin();
+    lastSavedSkin = { ...cachedSkin };
+  }
+  return cachedSkin;
+}
+
+function getCachedSkin() {
+  return cachedSkin || getSkinFallback();
+}
+
+const SKIN_FIELDS = ["wallpaper", "tagline", "primary", "secondary", "ink"];
+
+function diffSkin(prev, next) {
+  const diff = {};
+  for (const key of SKIN_FIELDS) {
+    if ((prev?.[key] ?? "") !== (next[key] ?? "")) {
+      diff[key] = next[key] ?? "";
+    }
+  }
+  return diff;
+}
+
+function persistSkin() {
+  const skin = getCachedSkin();
+  if (!lastSavedSkin) {
+    lastSavedSkin = { ...getSkinFallback() };
+  }
+  const diff = diffSkin(lastSavedSkin, skin);
+  if (!Object.keys(diff).length) {
+    // 无实际变更，跳过保存
+    return;
+  }
+  void (async () => {
+    try {
+      // 只提交变更字段：颜色/标语等轻量修改不再携带几 MB 壁纸数据
+      const saved = await saveSkinToServer(diff);
+      if (saved) {
+        lastSavedSkin = { ...skin };
+        try {
+          localStorage.removeItem(SKIN_STORAGE_KEY);
+        } catch {
+          // 忽略清除失败
+        }
+      } else {
+        try {
+          localStorage.setItem(SKIN_STORAGE_KEY, JSON.stringify(skin));
+        } catch (error) {
+          setError(`外观设置保存失败: ${error.message}`);
+        }
+      }
+    } catch {
+      // 保存失败静默，下次启动仍可从 localStorage 恢复部分设置
+    }
+  })();
 }
 
 function isThemeCustom(skin) {
@@ -2465,9 +2588,10 @@ function updateSkinSummary(skin) {
     elements.skinPreviewInner.textContent = skin.wallpaper ? "" : "默认壁纸";
   }
   if (elements.skinNote) {
+    const tagline = String(skin.tagline || "").trim();
     const parts = [];
     if (skin.wallpaper) parts.push("自定义壁纸");
-    if (skin.tagline.trim()) parts.push("自定义标语");
+    if (tagline) parts.push("自定义标语");
     if (isThemeCustom(skin)) parts.push("自定义配色");
     elements.skinNote.textContent = parts.length
       ? `已应用：${parts.join("、")}，重启后仍然生效。`
@@ -2486,7 +2610,7 @@ function applyWallpaper(dataUrl) {
 function applyTagline(tagline) {
   const element = document.querySelector("#heroTagline");
   if (element) {
-    element.textContent = tagline.trim() || DEFAULT_TAGLINE;
+    element.textContent = String(tagline || "").trim() || DEFAULT_TAGLINE;
   }
 }
 
@@ -2545,8 +2669,8 @@ function resetTheme() {
   THEME_CSS_VARS.forEach((name) => root.style.removeProperty(name));
 }
 
-function restoreSkin() {
-  const skin = getSkin();
+async function restoreSkin() {
+  const skin = await ensureSkinLoaded();
   if (skin.wallpaper) {
     applyWallpaper(skin.wallpaper);
   }
@@ -2574,7 +2698,12 @@ async function compressImageFile(file) {
     context.fillStyle = "#FFFFFF";
     context.fillRect(0, 0, width, height);
     context.drawImage(bitmap, 0, 0, width, height);
-    return canvas.toDataURL("image/jpeg", 0.85);
+    // 统一转为 webp（比 JPEG 体积更小），环境不支持时回退 JPEG
+    let dataUrl = canvas.toDataURL("image/webp", 0.85);
+    if (!dataUrl.startsWith("data:image/webp")) {
+      dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    }
+    return dataUrl;
   } finally {
     bitmap.close();
   }
@@ -2586,10 +2715,10 @@ async function importWallpaperFromFile(file) {
     if (dataUrl.length > WALLPAPER_MAX_DATA_URL_BYTES) {
       throw new Error("压缩后的壁纸仍然过大，请换一张分辨率或体积更小的图片。");
     }
-    const skin = getSkin();
+    const skin = await ensureSkinLoaded();
     skin.wallpaper = dataUrl;
     applyWallpaper(dataUrl);
-    persistSkin(skin);
+    persistSkin();
     updateSkinSummary(skin);
     setReady("背景壁纸已更换。");
     return true;
@@ -2603,21 +2732,21 @@ function handleWallpaperImport() {
   elements.skinFileInput?.click();
 }
 
-function handleWallpaperReset() {
-  const skin = getSkin();
+async function handleWallpaperReset() {
+  const skin = await ensureSkinLoaded();
   skin.wallpaper = "";
   applyWallpaper("");
-  persistSkin(skin);
+  persistSkin();
   updateSkinSummary(skin);
   setReady("已恢复默认壁纸。");
 }
 
-function handleTaglineChange() {
+async function handleTaglineChange() {
   const tagline = (elements.skinTaglineInput?.value || "").trim();
-  const skin = getSkin();
+  const skin = await ensureSkinLoaded();
   skin.tagline = tagline;
   applyTagline(tagline);
-  persistSkin(skin);
+  persistSkin();
   updateSkinSummary(skin);
   setReady(tagline ? "首页标语已更新。" : "已恢复默认标语。");
 }
@@ -2626,36 +2755,42 @@ function handleTaglineReset() {
   if (elements.skinTaglineInput) {
     elements.skinTaglineInput.value = "";
   }
-  handleTaglineChange();
+  void handleTaglineChange();
 }
 
-function handleColorChange() {
-  const skin = getSkin();
+function handleColorPreview() {
+  // 拖动取色器时仅实时预览，不写存储
+  const skin = getCachedSkin();
   skin.primary = elements.skinPrimaryColor?.value || DEFAULT_THEME.primary;
   skin.secondary = elements.skinSecondaryColor?.value || DEFAULT_THEME.secondary;
   skin.ink = elements.skinInkColor?.value || DEFAULT_THEME.ink;
   applyTheme(skin);
-  persistSkin(skin);
   updateSkinSummary(skin);
+}
+
+async function handleColorChange() {
+  await ensureSkinLoaded();
+  handleColorPreview();
+  persistSkin();
   setReady("整体配色已更新。");
 }
 
-function handleColorsReset() {
+async function handleColorsReset() {
   if (elements.skinPrimaryColor) elements.skinPrimaryColor.value = DEFAULT_THEME.primary;
   if (elements.skinSecondaryColor) elements.skinSecondaryColor.value = DEFAULT_THEME.secondary;
   if (elements.skinInkColor) elements.skinInkColor.value = DEFAULT_THEME.ink;
-  const skin = getSkin();
+  const skin = await ensureSkinLoaded();
   skin.primary = DEFAULT_THEME.primary;
   skin.secondary = DEFAULT_THEME.secondary;
   skin.ink = DEFAULT_THEME.ink;
   resetTheme();
-  persistSkin(skin);
+  persistSkin();
   updateSkinSummary(skin);
   setReady("已恢复默认配色。");
 }
 
-function showSkinModal() {
-  const skin = getSkin();
+async function showSkinModal() {
+  const skin = await ensureSkinLoaded();
   if (elements.skinTaglineInput) elements.skinTaglineInput.value = skin.tagline;
   if (elements.skinPrimaryColor) elements.skinPrimaryColor.value = skin.primary;
   if (elements.skinSecondaryColor) elements.skinSecondaryColor.value = skin.secondary;
@@ -2679,9 +2814,12 @@ function wireSkin() {
   elements.skinTaglineResetButton?.addEventListener("click", handleTaglineReset);
   elements.skinColorsResetButton?.addEventListener("click", handleColorsReset);
   elements.skinTaglineInput?.addEventListener("change", handleTaglineChange);
-  elements.skinPrimaryColor?.addEventListener("input", handleColorChange);
-  elements.skinSecondaryColor?.addEventListener("input", handleColorChange);
-  elements.skinInkColor?.addEventListener("input", handleColorChange);
+  elements.skinPrimaryColor?.addEventListener("input", handleColorPreview);
+  elements.skinSecondaryColor?.addEventListener("input", handleColorPreview);
+  elements.skinInkColor?.addEventListener("input", handleColorPreview);
+  elements.skinPrimaryColor?.addEventListener("change", handleColorChange);
+  elements.skinSecondaryColor?.addEventListener("change", handleColorChange);
+  elements.skinInkColor?.addEventListener("change", handleColorChange);
   elements.skinFileInput?.addEventListener("change", async () => {
     const file = elements.skinFileInput.files?.[0];
     elements.skinFileInput.value = "";
@@ -2728,7 +2866,7 @@ function wireSetup() {
 
 async function bootstrap() {
   // 先恢复已保存的外观设置（壁纸/标语/配色），避免加载后闪烁
-  restoreSkin();
+  await restoreSkin();
 
   wireNavigation();
   wireConfirmModal();

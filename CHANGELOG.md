@@ -4,14 +4,17 @@
 ### 🎨 新增功能
 
 - ✅ 新增「外观设置」：自定义背景壁纸、首页标语文字与整体配色（主色 / 辅助色 / 文字色），支持一键恢复默认
-- ✅ 支持导入本地图片作为背景壁纸（png / jpeg / webp / bmp / gif / avif，≤20MB，自动压缩至最长边 2560px）
+- ✅ 支持导入本地图片作为背景壁纸（png / jpeg / webp / bmp / gif / avif，≤20MB，自动压缩至最长边 2560px），导入时统一自动转为 webp 格式减小体积
 - ✅ 侧边栏新增「🎨 外观设置」入口；菜单栏新增「外观设置」子菜单（打开外观设置 / 导入背景壁纸 / 恢复默认壁纸）
 - ✅ 外观设置仅保存在本机，数据不离开本地
 
 ### 🔧 技术改进
 
-- ✅ 外观配置统一存入 `localStorage`（`weipython.skin`），自动迁移旧版壁纸存储键
+- ✅ 外观配置持久化到用户数据目录（`userData/skin.json`），不受本地服务随机端口影响，重启后设置完整保留；web 模式回退 localStorage
+- ✅ 保存采用增量合并：颜色 / 标语等轻量修改只提交变更字段，不再全量携带壁纸数据；服务端串行化写队列防止并发覆盖
+- ✅ 背景层优化：去掉冗余 `background-attachment: fixed`，避免大壁纸滚动时整图重绘卡顿
 - ✅ preload 新增 `onRequestSkinOpen` / `onRequestWallpaperImport` / `onRequestWallpaperReset` IPC 事件
+- ✅ 兼容迁移：旧版 `localStorage` 壁纸配置自动迁移至文件存储
 
 ---
 
