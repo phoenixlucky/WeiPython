@@ -81,14 +81,18 @@
 
 ## 🚀 快速开始
 
+> **环境要求：Node.js ≥ 24**（推荐通过 [nvm-windows](https://github.com/coreybutler/nvm-windows) 管理）。项目根目录已提供 `.nvmrc`，在项目目录执行 `nvm use` 即可自动切换到 Node 24。
+
 | 命令 | 说明 |
 |------|------|
+| `nvm use` | 按 `.nvmrc` 切换到 Node 24 |
 | `npm install` | 安装依赖 |
 | `npm run web` | 启动本地 Web 服务，浏览器访问 `http://localhost:3210` |
 | `npm run desktop` | 启动 Electron 桌面版（先启动内置本地服务，再打开窗口） |
 | `npm test` | 运行测试 |
 
 ```bash
+nvm use             # 切换到 Node 24（如未安装：nvm install 24 && nvm use）
 npm install
 npm run web        # 浏览器访问 http://localhost:3210
 npm run desktop    # 或直接启动桌面版
@@ -130,7 +134,7 @@ Windows 下可直接运行项目根目录的 **`一键打包.bat`**，交互式�
 | 软件名称 | `尉Python环境管理器` |
 | 软件公司 | `尉缭子科技` |
 | 可执行文件 | `WeiPython.exe` |
-| 安装包文件名 | `WeiPython-Setup-2.8.7.exe` |
+| 安装包文件名 | `WeiPython-Setup-2.9.1.exe` |
 | 默认安装目录 | `D:\Program Files\WeiPython` |
 | 安装模式 | 仅机器级安装（不再显示“仅为我安装”） |
 | GitHub 仓库 | <https://github.com/phoenixlucky/WeiPython> |

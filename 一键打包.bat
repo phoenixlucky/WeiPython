@@ -1,65 +1,66 @@
-@echo off
+ï»¿@echo off
+chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 REM ============================================================
-REM  WeiPython Manager Ò»¼ü´ò°ü¹¤¾ß
-REM  ¹¦ÄÜ£ºÏÔÊ¾µ±Ç°°æ±¾ºÅ / ÉèÖÃĞÂ°æ±¾ºÅ / Ò»¼ü´ò°ü
+REM  WeiPython Manager ä¸€é”®æ‰“åŒ…å·¥å…·
+REM  åŠŸèƒ½ï¼šæ˜¾ç¤ºå½“å‰ç‰ˆæœ¬å· / è®¾ç½®æ–°ç‰ˆæœ¬å· / ä¸€é”®æ‰“åŒ…
 REM ============================================================
 
 cd /d "%~dp0"
-title WeiPython Manager Ò»¼ü´ò°ü
+title WeiPython Manager ä¸€é”®æ‰“åŒ…
 
 echo ============================================================
-echo    WeiPython Manager Ò»¼ü´ò°ü¹¤¾ß
+echo    WeiPython Manager ä¸€é”®æ‰“åŒ…å·¥å…·
 echo ============================================================
 echo.
 
-REM ---------- ¶ÁÈ¡µ±Ç°°æ±¾ºÅ ----------
+REM ---------- è¯»å–å½“å‰ç‰ˆæœ¬å· ----------
 for /f "delims=" %%i in ('node scripts\set-version.mjs') do set "CUR_VERSION=%%i"
 if errorlevel 1 (
-  echo [´íÎó] ¶ÁÈ¡°æ±¾ºÅÊ§°Ü¡£
-  echo        ÇëÈ·ÈÏÒÑ°²×° Node.js£¬²¢ÇÒ±¾½Å±¾Î»ÓÚÏîÄ¿¸ùÄ¿Â¼¡£
+  echo [é”™è¯¯] è¯»å–ç‰ˆæœ¬å·å¤±è´¥ã€‚
+  echo        è¯·ç¡®è®¤å·²å®‰è£… Node.jsï¼Œå¹¶ä¸”æœ¬è„šæœ¬ä½äºé¡¹ç›®æ ¹ç›®å½•ã€‚
   pause
   exit /b 1
 )
-echo µ±Ç°°æ±¾ºÅ£ºv%CUR_VERSION%
+echo å½“å‰ç‰ˆæœ¬å·ï¼šv%CUR_VERSION%
 echo.
 
-REM ---------- ÉèÖÃĞÂ°æ±¾ºÅ£¨¿ÉÑ¡£© ----------
+REM ---------- è®¾ç½®æ–°ç‰ˆæœ¬å·ï¼ˆå¯é€‰ï¼‰ ----------
 set "NEW_VERSION="
-set /p "NEW_VERSION=ÇëÊäÈëĞÂ°æ±¾ºÅ£¨Ö±½Ó»Ø³µ±£³Ö v%CUR_VERSION%£©£º"
+set /p "NEW_VERSION=è¯·è¾“å…¥æ–°ç‰ˆæœ¬å·ï¼ˆç›´æ¥å›è½¦ä¿æŒ v%CUR_VERSION%ï¼‰ï¼š"
 if not "!NEW_VERSION!"=="" (
   node scripts\set-version.mjs --check !NEW_VERSION! >nul 2>&1
   if errorlevel 1 (
-    echo [´íÎó] °æ±¾ºÅ¸ñÊ½²»ÕıÈ·£º!NEW_VERSION!
-    echo        Ó¦Îª X.Y.Z£¬ÀıÈç 2.8.0£»¿ÉÑ¡Ô¤·¢²¼ºó×º£¬ÀıÈç 2.8.0-beta.1
+    echo [é”™è¯¯] ç‰ˆæœ¬å·æ ¼å¼ä¸æ­£ç¡®ï¼š!NEW_VERSION!
+    echo        åº”ä¸º X.Y.Zï¼Œä¾‹å¦‚ 2.8.0ï¼›å¯é€‰é¢„å‘å¸ƒåç¼€ï¼Œä¾‹å¦‚ 2.8.0-beta.1
     pause
     exit /b 1
   )
-  echo ÕıÔÚ¸üĞÂ°æ±¾ºÅ ...
+  echo æ­£åœ¨æ›´æ–°ç‰ˆæœ¬å· ...
   node scripts\set-version.mjs !NEW_VERSION!
   set "CUR_VERSION=!NEW_VERSION!"
   echo.
 )
 
-REM ---------- Ñ¡Ôñ´ò°üÄ£Ê½ ----------
-echo ´ò°üÄ£Ê½£º
-echo   1 - ÍêÕû°²×°°ü£¨NSIS£¬Éú³É Setup.exe£¬ÍÆ¼ö£©
-echo   2 - Ãâ°²×°Ä¿Â¼£¨win-unpacked£¬²»Éú³É°²×°³ÌĞò£¬¸ü¿ì£©
+REM ---------- é€‰æ‹©æ‰“åŒ…æ¨¡å¼ ----------
+echo æ‰“åŒ…æ¨¡å¼ï¼š
+echo   1 - å®Œæ•´å®‰è£…åŒ…ï¼ˆNSISï¼Œç”Ÿæˆ Setup.exeï¼Œæ¨èï¼‰
+echo   2 - å…å®‰è£…ç›®å½•ï¼ˆwin-unpackedï¼Œä¸ç”Ÿæˆå®‰è£…ç¨‹åºï¼Œæ›´å¿«ï¼‰
 set "MODE="
-set /p "MODE=ÇëÑ¡Ôñ£¨Ö±½Ó»Ø³µÄ¬ÈÏ 1£©£º"
+set /p "MODE=è¯·é€‰æ‹©ï¼ˆç›´æ¥å›è½¦é»˜è®¤ 1ï¼‰ï¼š"
 if "!MODE!"=="2" (
   set "PACK_CMD=npm run pack"
 ) else (
   set "PACK_CMD=npm run dist"
 )
 
-REM ---------- ÒÀÀµ¼ì²é ----------
+REM ---------- ä¾èµ–æ£€æŸ¥ ----------
 if not exist node_modules\electron-builder (
-  echo [ÌáÊ¾] Î´¼ì²âµ½ electron-builder£¬ÏÈÖ´ĞĞ npm install ...
+  echo [æç¤º] æœªæ£€æµ‹åˆ° electron-builderï¼Œå…ˆæ‰§è¡Œ npm install ...
   call npm install
   if errorlevel 1 (
-    echo [´íÎó] npm install Ê§°Ü¡£
+    echo [é”™è¯¯] npm install å¤±è´¥ã€‚
     pause
     exit /b 1
   )
@@ -67,27 +68,27 @@ if not exist node_modules\electron-builder (
 
 echo.
 echo ============================================================
-echo  ¿ªÊ¼´ò°ü v!CUR_VERSION! ...
-echo  ÃüÁî£º!PACK_CMD!
-echo  ¿ªÊ¼Ê±¼ä£º%date% %time%
+echo  å¼€å§‹æ‰“åŒ… v!CUR_VERSION! ...
+echo  å‘½ä»¤ï¼š!PACK_CMD!
+echo  å¼€å§‹æ—¶é—´ï¼š%date% %time%
 echo ============================================================
 call !PACK_CMD!
 set "BUILD_CODE=%errorlevel%"
 echo ============================================================
 if not "!BUILD_CODE!"=="0" (
-  echo [´íÎó] ´ò°üÊ§°Ü£¬´íÎóÂë !BUILD_CODE!£¬Çë²é¿´ÉÏ·½ÈÕÖ¾¡£
+  echo [é”™è¯¯] æ‰“åŒ…å¤±è´¥ï¼Œé”™è¯¯ç  !BUILD_CODE!ï¼Œè¯·æŸ¥çœ‹ä¸Šæ–¹æ—¥å¿—ã€‚
   pause
   exit /b 1
 )
 
 echo.
-echo [³É¹¦] ´ò°üÍê³É£¡
-echo ²úÎïÄ¿Â¼£ºdist
+echo [æˆåŠŸ] æ‰“åŒ…å®Œæˆï¼
+echo äº§ç‰©ç›®å½•ï¼šdist
 for /f "delims=" %%f in ('dir /b /o-d dist\*.exe 2^>nul') do (
-  echo °²×°°ü£ºdist\%%f
+  echo å®‰è£…åŒ…ï¼šdist\%%f
   goto :show_done
 )
 :show_done
-echo ½áÊøÊ±¼ä£º%date% %time%
+echo ç»“æŸæ—¶é—´ï¼š%date% %time%
 echo.
 pause

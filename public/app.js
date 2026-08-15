@@ -2415,9 +2415,9 @@ const WALLPAPER_MAX_DATA_URL_BYTES = 4.5 * 1024 * 1024;
 
 const DEFAULT_TAGLINE = "以工程控制台的方式管理 Python 环境";
 const DEFAULT_THEME = {
-  primary: "#F48FB1",
-  secondary: "#C9A9C6",
-  ink: "#2D1B2E"
+  primary: "#2563EB",
+  secondary: "#0EA5E9",
+  ink: "#0F172A"
 };
 
 function getSkinFallback() {
@@ -2912,51 +2912,28 @@ async function bootstrap() {
     } catch (error) {
       setReady(error.message);
     }
-  // ---------- 樱花花瓣：鼠标风速感知 + 定期阵风 ----------
-  const petalContainer = document.querySelector(".petal-container");
-  let gusting = false;
-  let lastMouseX = 0;
-  let lastMouseTime = 0;
-
-  document.addEventListener("mousemove", (e) => {
-    const now = Date.now();
-    const dt = now - lastMouseTime;
-    if (dt > 0) {
-      const dx = e.clientX - lastMouseX;
-      const speed = Math.abs(dx / dt);
-      if (speed > 0.4 && !gusting) {
-        triggerGust();
+  // ---------- 全局日志折叠：默认折叠，点击头部展开/收起 ----------
+  const globalLogPanel = document.querySelector("#globalLogPanel");
+  const globalLogToggle = document.querySelector("#globalLogToggle");
+  if (globalLogPanel && globalLogToggle) {
+    const setLogCollapsed = (collapsed) => {
+      globalLogPanel.classList.toggle("collapsed", collapsed);
+      globalLogToggle.setAttribute("aria-expanded", String(!collapsed));
+    };
+    const toggleLogPanel = (event) => {
+      // 点击头部的清空按钮等内部控件时不切换折叠状态
+      if (event && event.target.closest("#clearGlobalLogButton")) return;
+      setLogCollapsed(!globalLogPanel.classList.contains("collapsed"));
+    };
+    globalLogToggle.addEventListener("click", toggleLogPanel);
+    globalLogToggle.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleLogPanel(event);
       }
-    }
-    lastMouseX = e.clientX;
-    lastMouseTime = now;
-  });
-
-  // 定期自动阵风（每 25 秒）
-  setInterval(() => {
-    if (!gusting) triggerGust();
-  }, 25000);
-
-  function triggerGust() {
-    gusting = true;
-    const startTime = performance.now();
-    const duration = 600;
-    const maxWind = 100 + Math.random() * 60;
-
-    function animate(time) {
-      const elapsed = time - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const easeOut = 1 - Math.pow(1 - progress, 3);
-      const offset = maxWind * Math.pow(1 - easeOut, 0.6);
-      petalContainer.style.transform = `translateX(${offset}px)`;
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        petalContainer.style.transform = "";
-        gusting = false;
-      }
-    }
-    requestAnimationFrame(animate);
+    });
+    // 初始默认折叠（与 HTML 中的 collapsed 类保持一致）
+    setLogCollapsed(true);
   }
 }
 

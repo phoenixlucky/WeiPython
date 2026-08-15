@@ -10,24 +10,23 @@
     <div class="app-shell">
       <aside class="sidebar">
         <div class="sidebar-panel brand-block">
-          <span class="brand-mark">WeiPython Manager</span>
-          <span class="version-chip">v2.8.7</span>
-          <p class="eyebrow">Engineering Console</p>
-          <h1>尉Python 环境管理器</h1>
-          <p class="brand-subtitle">Wei Python Environment Manager</p>
-          <p class="brand-copy">尉缭子科技出品。面向开发场景的本地环境控制台，统一处理 Python、Conda、venv 与包维护任务。</p>
+          <div class="brand-mark">
+            <span class="brand-repl">&gt;&gt;&gt;</span>
+            <div class="brand-name">WeiPython<small>v2.9.1 · manager</small></div>
+          </div>
+          <p class="brand-copy">尉缭子科技出品。本地环境控制台，统一处理 Python、Conda、venv 与包维护任务。</p>
         </div>
 
         <div class="sidebar-panel">
           <p class="sidebar-title">工作区</p>
           <nav class="nav-list">
-            <button class="nav-item active" data-panel="overview"><span class="nav-icon">🏠</span>概览</button>
-            <button class="nav-item" data-panel="setup"><span class="nav-icon">🚀</span>初始化配置</button>
-            <button class="nav-item" data-panel="conda"><span class="nav-icon">🧪</span>Conda</button>
-            <button class="nav-item" data-panel="conda-python"><span class="nav-icon">🐍</span>Python 版本</button>
-            <button class="nav-item" data-panel="venv"><span class="nav-icon">📦</span>虚拟环境</button>
-            <button class="nav-item" data-panel="packages"><span class="nav-icon">🧩</span>包管理</button>
-            <button class="nav-item" id="navAboutButton" data-panel="about"><span class="nav-icon">ℹ️</span>关于</button>
+            <button class="nav-item active" data-panel="overview"><span class="nav-icon">&gt;_</span>概览</button>
+            <button class="nav-item" data-panel="setup"><span class="nav-icon">↻</span>初始化配置</button>
+            <button class="nav-item" data-panel="conda"><span class="nav-icon">≈</span>Conda</button>
+            <button class="nav-item" data-panel="conda-python"><span class="nav-icon">»</span>Python 版本</button>
+            <button class="nav-item" data-panel="venv"><span class="nav-icon">▣</span>虚拟环境</button>
+            <button class="nav-item" data-panel="packages"><span class="nav-icon">λ</span>包管理</button>
+            <button class="nav-item" id="navAboutButton"><span class="nav-icon">?</span>关于</button>
           </nav>
         </div>
 
@@ -44,21 +43,18 @@
       </aside>
 
       <main class="main-stage">
-        <section class="hero-card">
-          <div class="hero-copy">
-            <p class="eyebrow">WeiPython Manager</p>
-            <h2 id="heroTagline">以工程控制台的方式管理 Python 环境</h2>
-          </div>
-          <div class="hero-meta">
-            <span id="heroNodeVersion">Node</span>
-            <span id="heroCondaState">Conda</span>
-          </div>
-        </section>
+      <header class="topbar">
+        <span class="topbar-repl"><b>&gt;&gt;&gt;</b> <span id="heroTagline">以工程控制台的方式管理 Python 环境</span></span>
+        <div class="topbar-runtime">
+          <span class="runtime-chip" id="heroNodeVersion">Node</span>
+          <span class="runtime-chip" id="heroCondaState">Conda</span>
+        </div>
+      </header>
 
         <section class="panel active" id="panel-overview">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Overview</p>
+              <p class="eyebrow">// Overview</p>
               <h3>系统与运行时总览</h3>
             </div>
             <div class="button-row compact-buttons">
@@ -91,7 +87,7 @@
         <section class="panel" id="panel-setup">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">First-run Setup</p>
+              <p class="eyebrow">// First-run Setup</p>
               <h3>新电脑初始化配置</h3>
             </div>
             <button class="ghost-button" id="refreshSetupButton">重新检测</button>
@@ -188,7 +184,7 @@
         <section class="panel" id="panel-conda">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Conda</p>
+              <p class="eyebrow">// Conda</p>
               <h3>环境创建与环境文件工作流</h3>
             </div>
             <button class="ghost-button" id="refreshCondaButton">刷新环境</button>
@@ -386,7 +382,7 @@
         <section class="panel" id="panel-conda-python">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Conda Python</p>
+              <p class="eyebrow">// Conda Python</p>
               <h3>Conda 可用的 Python 版本</h3>
             </div>
             <button class="ghost-button" id="refreshCondaPythonVersionsButton">刷新</button>
@@ -425,7 +421,7 @@
         <section class="panel" id="panel-venv">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Virtualenv</p>
+              <p class="eyebrow">// Virtualenv</p>
               <h3>标准库虚拟环境</h3>
             </div>
             <button class="ghost-button" id="refreshVenvButton">刷新环境</button>
@@ -476,7 +472,7 @@
         <section class="panel" id="panel-packages">
           <div class="panel-header">
             <div>
-              <p class="eyebrow">Packages</p>
+              <p class="eyebrow">// Packages</p>
               <h3>包安装、维护与诊断</h3>
             </div>
             <button class="ghost-button" id="refreshTargetsButton">刷新环境目标</button>
@@ -585,19 +581,23 @@
           </div>
         </section>
 
-        <section class="global-log-panel" id="globalLogPanel" aria-live="polite">
-          <div class="global-log-head">
-            <div>
-              <p class="eyebrow">Runtime Log</p>
+        <section class="global-log-panel collapsed" id="globalLogPanel" aria-live="polite">
+          <div class="global-log-head" id="globalLogToggle" role="button" tabindex="0" aria-expanded="false" title="展开 / 收起运行日志">
+            <span class="dot-row"><i></i><i></i><i></i></span>
+            <div class="global-log-titles">
+              <p class="eyebrow">// runtime · run.log</p>
               <h3 id="globalLogTitle">运行日志</h3>
             </div>
             <div class="global-log-actions">
               <span class="global-log-status" id="globalLogStatus">就绪</span>
               <button class="ghost-button mini-button" type="button" id="clearGlobalLogButton">清空</button>
+              <span class="global-log-chevron" aria-hidden="true">▾</span>
             </div>
           </div>
-          <p class="global-log-message" id="globalLogMessage">等待操作。</p>
-          <pre class="global-log-output" id="globalLogOutput">尚未开始。</pre>
+          <div class="global-log-body">
+            <p class="global-log-message" id="globalLogMessage">等待操作。</p>
+            <pre class="global-log-output" id="globalLogOutput">尚未开始。</pre>
+          </div>
         </section>
       </main>
     </div>
@@ -648,15 +648,15 @@
           <div class="skin-color-grid">
             <label class="skin-color-field">
               <span>主色</span>
-              <input type="color" id="skinPrimaryColor" value="#F48FB1" />
+              <input type="color" id="skinPrimaryColor" value="#2563EB" />
             </label>
             <label class="skin-color-field">
               <span>辅助色</span>
-              <input type="color" id="skinSecondaryColor" value="#C9A9C6" />
+              <input type="color" id="skinSecondaryColor" value="#0EA5E9" />
             </label>
             <label class="skin-color-field">
               <span>文字色</span>
-              <input type="color" id="skinInkColor" value="#2D1B2E" />
+              <input type="color" id="skinInkColor" value="#0F172A" />
             </label>
             <button class="ghost-button mini-button" type="button" id="skinColorsResetButton">恢复默认配色</button>
           </div>
@@ -666,34 +666,13 @@
       </div>
     </div>
 
-    <!-- 光晕装饰 -->
-    <div class="glow-orb glow-orb--pink"></div>
-    <div class="glow-orb glow-orb--lavender"></div>
 
-    <!-- 花瓣粒子容器 -->
-    <div class="petal-container">
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-      <div class="petal"></div>
-    </div>
 
     <div class="modal-backdrop hidden" id="aboutModal">
       <div class="modal-card about-card">
         <div class="about-head">
           <p class="eyebrow">About</p>
-          <h3>WeiPython Manager / 尉Python 环境管理器 v2.8.7</h3>
+          <h3>WeiPython Manager / 尉Python 环境管理器 v2.9.1</h3>
           <button class="ghost-button" type="button" id="aboutCloseButton" title="关闭">✕</button>
         </div>
         <div class="about-body">
@@ -704,7 +683,7 @@
 
           <section class="about-section">
             <h4>当前版本</h4>
-            <p id="aboutVersion">v2.8.7</p>
+            <p id="aboutVersion">v2.9.1</p>
           </section>
 
           <section class="about-section">
@@ -747,7 +726,7 @@
             <h4>系统信息</h4>
             <div class="about-kv">
               <span>运行环境</span><span id="aboutPlatform">检测中...</span>
-              <span>构建版本</span><span id="aboutVersionDetail">v2.8.7</span>
+              <span>构建版本</span><span id="aboutVersionDetail">v2.9.1</span>
               <span>Node.js</span><span id="aboutNodeVersion">-</span>
               <span>Conda</span><span id="aboutCondaState">-</span>
             </div>
