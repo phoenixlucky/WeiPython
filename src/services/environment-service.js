@@ -94,8 +94,44 @@ function parseMissingCondaPackages(output = "") {
   return missing;
 }
 
-function condaSpecToPipSpec(spec) {
+// 这些包只存在于 Anaconda 官方渠道（PyPI 上没有），conda-forge 也无法解析；
+// 克隆 base 时会把它们带入 fallback 清单，必须跳过，否则会拖垮整批 pip 安装
+const CONDA_ONLY_PACKAGE_NAMES = new Set([
+  "conda-anaconda-telemetry",
+  "conda-anaconda-tos",
+  "anaconda_prompt",
+  "anaconda_powershell_prompt"
+]);
+
+function getCondaSpecName(spec) {
   const value = String(spec || "").trim();
+  return value.match(/^([A-Za-z0-9_.-]+)/)?.[1]?.toLowerCase() || "";
+}
+
+function isPythonBootstrapPackage(spec) {
+  return ["pip", "setuptools", "wheel"].includes(getCondaSpecName(spec));
+}
+
+export function isCondaOnlyPackage(spec) {
+  return CONDA_ONLY_PACKAGE_NAMES.has(getCondaSpecName(spec));
+}
+
+export function condaSpecToPipSpec(spec) {
+  let value = String(spec || "").trim();
+
+  // conda --from-history 会导出 MatchSpec 方括号语法（如 pkg[version='>=0.2.0']），
+  // pip 把方括号当 PEP 508 extras 解析会直接抛 InvalidRequirement，
+  // 这里还原为 pip 可读的版本约束（python_version 等 pip 不支持的约束直接丢弃）
+  const bracketMatch = value.match(/^([A-Za-z0-9_.-]+)\[(.*)\]$/);
+  if (bracketMatch) {
+    const name = bracketMatch[1];
+    const versionConstraints = [...bracketMatch[2].matchAll(/([A-Za-z_][\w]*)\s*=\s*['"]([^'"]*)['"]/g)]
+      .filter((entry) => entry[1] === "version")
+      .map((entry) => entry[2])
+      .join(",");
+    value = versionConstraints ? `${name}${versionConstraints}` : name;
+  }
+
   const exactMatch = value.match(/^([A-Za-z0-9_.-]+)=([^=<>!~]+)$/);
   if (exactMatch) {
     return `${exactMatch[1]}==${exactMatch[2]}`;
@@ -107,15 +143,6 @@ function condaSpecToPipSpec(spec) {
   }
 
   return value;
-}
-
-function getCondaSpecName(spec) {
-  const value = String(spec || "").trim();
-  return value.match(/^([A-Za-z0-9_.-]+)/)?.[1]?.toLowerCase() || "";
-}
-
-function isPythonBootstrapPackage(spec) {
-  return ["pip", "setuptools", "wheel"].includes(getCondaSpecName(spec));
 }
 
 function formatCondaFailure(stderr = "", stdout = "") {
@@ -562,9 +589,10 @@ function parseExportedCondaSpecs(exportedYaml) {
 
 async function installPackagesWithPipFallback(envName, condaSpecs, pipSpecs, solveArgs, preferredRoot) {
   const requestedCondaSpecs = condaSpecs.filter(
-    (spec) => !/^python(?:\s*$|[=<>!~])/i.test(spec) && !isPythonBootstrapPackage(spec)
+    (spec) => !/^python(?:\s*$|[=<>!~])/i.test(spec) && !isPythonBootstrapPackage(spec) && !isCondaOnlyPackage(spec)
   );
-  const pipFallbackSpecs = pipSpecs.filter((spec) => !isPythonBootstrapPackage(spec));
+  const pipFallbackSpecs = pipSpecs.filter((spec) => !isPythonBootstrapPackage(spec) && !isCondaOnlyPackage(spec));
+  const skippedCondaOnlySpecs = [...condaSpecs, ...pipSpecs].filter((spec) => isCondaOnlyPackage(spec));
 
   if (requestedCondaSpecs.length) {
     const installResult = await runCondaCommand(["install", ...solveArgs, "-n", envName, ...requestedCondaSpecs, "-y"], preferredRoot);
@@ -587,7 +615,9 @@ async function installPackagesWithPipFallback(envName, condaSpecs, pipSpecs, sol
     }
   }
 
-  const uniquePipFallbackSpecs = [...new Set(pipFallbackSpecs.filter((spec) => spec && !isPythonBootstrapPackage(spec)))];
+  const uniquePipFallbackSpecs = [
+    ...new Set(pipFallbackSpecs.filter((spec) => spec && !isPythonBootstrapPackage(spec) && !isCondaOnlyPackage(spec)))
+  ];
   if (uniquePipFallbackSpecs.length) {
     const { environments } = await listCondaEnvironments(preferredRoot);
     const env = environments.find((entry) => entry.name === envName);
@@ -599,7 +629,28 @@ async function installPackagesWithPipFallback(envName, condaSpecs, pipSpecs, sol
     await ensurePipAvailable(pythonExecutable);
     const pipResult = await runCommand(pythonExecutable, ["-m", "pip", "install", ...uniquePipFallbackSpecs]);
     if (!pipResult.ok) {
-      throw new Error(formatCondaFailure(pipResult.stderr, pipResult.stdout));
+      // pip 安装是整批 all-or-nothing：单个包无法解析/下载会拖垮全部。
+      // 转为逐个安装，只让真正失败的包缺失，其余包照常就位
+      const perPackageResults = [];
+      for (const spec of uniquePipFallbackSpecs) {
+        const singleResult = await runCommand(pythonExecutable, ["-m", "pip", "install", spec]);
+        if (!singleResult.ok) {
+          perPackageResults.push({ spec, message: `${singleResult.stderr || singleResult.stdout || ""}`.trim() });
+        }
+      }
+      if (perPackageResults.length) {
+        const failureSummary = perPackageResults
+          .map(({ spec, message }) => `- ${spec}: ${message.split(/\r?\n/).slice(-3).join(" | ")}`)
+          .join("\n");
+        const skippedNote = skippedCondaOnlySpecs.length
+          ? `\n\n另有 ${skippedCondaOnlySpecs.length} 个 Anaconda 官方渠道专属包已跳过（PyPI 上不存在）：${skippedCondaOnlySpecs.join(", ")}`
+          : "";
+        throw new Error([
+          `以下 pip 包安装失败（${perPackageResults.length}/${uniquePipFallbackSpecs.length}），其余包已安装成功：`,
+          failureSummary,
+          skippedNote
+        ].filter(Boolean).join("\n"));
+      }
     }
   }
 }
