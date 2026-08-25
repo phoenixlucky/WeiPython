@@ -134,7 +134,7 @@ Windows 下可直接运行项目根目录的 **`一键打包.bat`**，交互式�
 | 软件名称 | `尉Python环境管理器` |
 | 软件公司 | `尉缭子科技` |
 | 可执行文件 | `WeiPython.exe` |
-| 安装包文件名 | `WeiPython-Setup-2.9.1.exe` |
+| 安装包文件名 | `WeiPython-Setup-2.9.2.exe` |
 | 默认安装目录 | `D:\Program Files\WeiPython` |
 | 安装模式 | 仅机器级安装（不再显示“仅为我安装”） |
 | GitHub 仓库 | <https://github.com/phoenixlucky/WeiPython> |
