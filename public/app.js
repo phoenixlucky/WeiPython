@@ -1133,11 +1133,32 @@ function populateCreateFormVersions(major, versions) {
   makeOptions(elements.condaClonePythonVersionSelect);
 }
 
+// 创建表单版本下拉的自动刷新去抖（避免多入口同时触发重复请求）
+let autoRefreshInFlight = false;
+
+// 缓存里有任一条目超过 TTL（与后端 CACHE_TTL_MS 一致）→ 后台全量刷新一次并重填下拉。
+// 不阻塞当前渲染：先用旧缓存填充，刷新完成后下拉自动更新为最新清单。
+function autoRefreshStaleCreateFormVersions(channel) {
+  if (autoRefreshInFlight) return;
+  autoRefreshInFlight = true;
+  const channelKey = channel || "defaults";
+  (async () => {
+    const params = new URLSearchParams({ channel: channelKey });
+    await request(`/api/conda/python-versions/refresh?${params}`, { method: "POST" });
+    await loadCreateFormVersions(channelKey, { skipAutoRefresh: true });
+    setReady(`Python 版本清单已自动更新（${channelKey}）。`);
+  })().catch(() => {}).finally(() => {
+    autoRefreshInFlight = false;
+  });
+}
+
 // 从缓存加载指定通道的全部版本数据，并更新创建表单的下拉
-async function loadCreateFormVersions(channel) {
+async function loadCreateFormVersions(channel, options = {}) {
   try {
     const cacheResp = await request("/api/conda/python-versions/cache");
     const versions = [];
+    let hasStaleEntry = false;
+    const staleCutoff = Date.now() - 60 * 60 * 1000; // 与后端 CACHE_TTL_MS 保持一致
     const channelKey = channel || "defaults";
     const channelData = cacheResp?.channels?.[channelKey] || {};
     // 合并所有大版本的小版本（新结构：{ versions: [...], updatedAt }）
@@ -1146,6 +1167,7 @@ async function loadCreateFormVersions(channel) {
         for (const v of entry.versions) {
           versions.push(v);
         }
+        if (!entry.updatedAt || entry.updatedAt < staleCutoff) hasStaleEntry = true;
       }
     }
 
@@ -1153,6 +1175,10 @@ async function loadCreateFormVersions(channel) {
       // 有缓存 → 直接用缓存数据填充
       versions.sort((a, b) => b.localeCompare(a, undefined, { numeric: true, sensitivity: "base" }));
       populateCreateFormVersions("", versions);
+      // 缓存过期 → 后台静默刷新，不阻塞当前下拉
+      if (hasStaleEntry && !options.skipAutoRefresh) {
+        autoRefreshStaleCreateFormVersions(channelKey);
+      }
       return;
     }
 
@@ -2226,12 +2252,10 @@ function wireCondaForm() {
       ? elements.condaCloneChannelSelect.value
       : elements.condaCreateChannelSelect.value;
     try {
-      // 刷新全部缓存（遍历大版本）
-      for (const major of CONDA_MAJOR_VERSIONS) {
-        const params = new URLSearchParams({ version: major, channel });
-        await request(`/api/conda/python-versions/refresh?${params}`, { method: "POST" });
-      }
-      await loadCreateFormVersions(channel);
+      // 单次全量刷新（后端一次 conda search 覆盖全部大版本并按大版本分桶缓存）
+      const params = new URLSearchParams({ channel });
+      await request(`/api/conda/python-versions/refresh?${params}`, { method: "POST" });
+      await loadCreateFormVersions(channel, { skipAutoRefresh: true });
       setReady(`Conda 版本缓存（${channel}）已刷新。`);
     } catch (error) {
      setReady(error.message);
