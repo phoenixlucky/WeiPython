@@ -27,6 +27,36 @@
   white-space: nowrap;
 }
 
+.button-grid,
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.button-grid > button {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.button-row {
+  justify-content: flex-end;
+}
+
+.switch-row {
+  display: flex !important;
+  align-items: center;
+  gap: 8px !important;
+  color: #5f718a;
+  font-size: 12px;
+}
+
+.switch-row input {
+  width: auto !important;
+  flex: none;
+}
+
 .global-error-banner {
   display: flex;
   align-items: center;
@@ -83,6 +113,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: 8px;
 }
 
 .inline-tools > div > input,
@@ -543,6 +574,16 @@
 .uv-installation.selected {
   border-color: #bfdbfe;
   background: #eff6ff;
+}
+
+.active-badge {
+  justify-self: end;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 @media (max-width: 1100px) {
@@ -1048,6 +1089,100 @@
 .text-danger:hover {
   border-color: #fca5a5;
   background: #fef2f2;
+}
+
+/* Package management: keep the selection grid and installed list visually distinct. */
+.packages-page .recommended-packages {
+  margin-top: 3px;
+  padding-top: 15px;
+  border-top: 1px solid #edf1f5;
+}
+
+.packages-page .recommended-packages .card-heading {
+  align-items: center;
+}
+
+.packages-page .package-choice {
+  min-height: 64px;
+  transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.packages-page .package-choice:hover,
+.packages-page .package-choice:has(input:checked) {
+  border-color: #bfdbfe;
+  background: #f7fbff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, .06);
+}
+
+.packages-page .package-choice input {
+  accent-color: #2563eb;
+}
+
+.packages-page .package-choice strong {
+  color: #1e3a63;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.packages-page .package-choice small {
+  line-height: 1.35;
+}
+
+.package-list {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border-top: 1px solid #edf1f5;
+}
+
+.package-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px 52px;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 9px 0;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.package-row strong,
+.package-row > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.package-row strong {
+  color: #1e3a63;
+  font-size: 13px;
+}
+
+.package-row > span {
+  color: #7d8999;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.package-row .link-button {
+  justify-self: end;
+  border: 1px solid #dbeafe;
+  border-radius: 7px;
+  padding: 6px 9px;
+  background: #eff6ff;
+  color: #2563eb;
+  white-space: nowrap;
+}
+
+.package-row .link-button:hover {
+  background: #dbeafe;
+}
+
+@media (max-width: 1100px) {
+  .package-row {
+    grid-template-columns: minmax(0, 1fr) 76px 48px;
+    gap: 8px;
+  }
 }
 
 .workspace-columns > .card .uv-installation {
