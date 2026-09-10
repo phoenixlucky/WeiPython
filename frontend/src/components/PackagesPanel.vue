@@ -5,10 +5,31 @@ import { useWorkspaceStore } from "@/stores/workspace";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const workspace = useWorkspaceStore();
-const form = reactive({ targetKey: "", packageName: "", indexUrl: "https://pypi.org/simple", requirementsPath: "" });
+const form = reactive({ targetKey: "", packageName: "", indexUrl: "https://pypi.org/simple", requirementsPath: "", recommendedPackages: ["numpy", "pandas", "openpyxl", "openai", "loguru"] });
 const showAdvanced = ref(false);
 const searchQuery = ref("");
 const confirmRequest = ref<{ title: string; message: string; confirmLabel: string; action: () => Promise<void> } | null>(null);
+const recommendedCatalog = [
+  { id: "numpy", label: "NumPy", description: "数组与数值计算" },
+  { id: "pandas", label: "Pandas", description: "表格数据处理" },
+  { id: "openpyxl", label: "OpenPyXL", description: "Excel 文件读写" },
+  { id: "matplotlib", label: "Matplotlib", description: "基础数据可视化" },
+  { id: "pyarrow", label: "PyArrow", description: "Arrow 与 Parquet 数据" },
+  { id: "openai", label: "OpenAI", description: "OpenAI Python SDK" },
+  { id: "loguru", label: "Loguru", description: "简洁的日志工具" },
+  { id: "streamlit", label: "Streamlit", description: "快速构建数据应用" },
+  { id: "DrissionPage", label: "DrissionPage", description: "浏览器自动化与采集" },
+  { id: "ipython-sql", label: "IPython SQL", description: "Notebook 中执行 SQL" },
+  { id: "SQLAlchemy", label: "SQLAlchemy", description: "数据库 ORM 与连接" },
+  { id: "aiomysql", label: "aiomysql", description: "异步 MySQL 客户端" },
+  { id: "PyMySQL", label: "PyMySQL", description: "纯 Python MySQL 客户端" },
+  { id: "mysql-connector-python", label: "MySQL Connector", description: "MySQL 官方连接器" },
+  { id: "schedule", label: "Schedule", description: "轻量定时任务" },
+  { id: "wei-data-shu[excel]", label: "wei-data-shu[excel]", description: "Excel 读写、拆分与合并" },
+  { id: "wei-data-shu[database]", label: "wei-data-shu[database]", description: "MySQL 数据库支持" },
+  { id: "wei-data-shu[analysis]", label: "wei-data-shu[analysis]", description: "文本分析、词云、趋势预测与数据分析" },
+  { id: "wei-data-shu[excel-client]", label: "wei-data-shu[excel-client]", description: "通过本机 Excel 应用操作工作簿和宏" },
+];
 const selectedTarget = computed(() => workspace.targets.find((target) => JSON.stringify(target) === form.targetKey));
 const filteredPackages = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
@@ -27,6 +48,21 @@ watch(selectedTarget, (target) => {
 async function action(actionName: string) {
   if (selectedTarget.value) {
     await workspace.packageAction({ target: selectedTarget.value, action: actionName, packageName: form.packageName, indexUrl: form.indexUrl, requirementsPath: form.requirementsPath });
+  }
+}
+
+function toggleRecommended() {
+  form.recommendedPackages = form.recommendedPackages.length === recommendedCatalog.length ? [] : recommendedCatalog.map((item) => item.id);
+}
+
+async function installRecommended() {
+  const target = selectedTarget.value;
+  const packages = [...form.recommendedPackages];
+  if (!target) return;
+  for (const packageName of packages) {
+    form.packageName = packageName;
+    await workspace.packageAction({ target, action: "install", packageName, indexUrl: form.indexUrl, requirementsPath: form.requirementsPath });
+    if (workspace.error) break;
   }
 }
 
@@ -74,6 +110,11 @@ async function acceptConfirm() {
           <button class="primary" :disabled="workspace.busy || !form.packageName" @click="action('install')">安装</button>
           <button class="secondary" :disabled="workspace.busy || !form.packageName" @click="action('upgrade')">升级</button>
           <button class="danger-action" :disabled="workspace.busy || !form.packageName" @click="uninstallPackage">卸载</button>
+        </div>
+        <div class="setup-package-section recommended-packages">
+          <div class="card-heading"><div><h3>推荐安装包</h3><p>选择常用库后快速安装到当前目标环境。</p></div><button class="secondary mini-button" type="button" :disabled="workspace.busy" @click="toggleRecommended">全选 / 清空</button></div>
+          <div class="package-choice-grid"><label v-for="item in recommendedCatalog" :key="item.id" class="package-choice"><input v-model="form.recommendedPackages" type="checkbox" :value="item.id" :disabled="workspace.busy" /><span><strong>{{ item.label }}</strong><small>{{ item.description }}</small></span></label></div>
+          <button class="primary wide" :disabled="workspace.busy || !selectedTarget || !form.recommendedPackages.length" @click="installRecommended">{{ workspace.busy ? '安装中…' : `安装已选 ${form.recommendedPackages.length} 个包` }}</button>
         </div>
         <details class="advanced-actions" :open="showAdvanced" @toggle="showAdvanced = ($event.target as HTMLDetailsElement).open">
           <summary>高级操作</summary>

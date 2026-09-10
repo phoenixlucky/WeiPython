@@ -56,9 +56,6 @@ pub struct PackageActionRequest {
 #[serde(rename_all = "camelCase")]
 pub struct SetupRequest {
     pub install_path: String,
-    pub python_version: String,
-    pub conda_packages: Vec<String>,
-    pub pip_packages: Vec<String>,
 }
 
 #[tauri::command]
@@ -100,13 +97,13 @@ pub async fn save_settings(settings: AppSettings) -> Result<(), String> { crate:
 pub async fn get_setup_status() -> Result<SetupStatus, String> { Ok(crate::services::setup_service::status().await) }
 
 #[tauri::command]
-pub async fn initialize_environment(install_path: String, python_version: String, conda_packages: Vec<String>, pip_packages: Vec<String>) -> Result<OperationResult, String> { crate::services::setup_service::initialize(install_path, python_version, conda_packages, pip_packages).await }
+pub async fn initialize_environment(install_path: String) -> Result<OperationResult, String> { crate::services::setup_service::initialize(install_path).await }
 
 #[tauri::command]
 pub fn start_initialize_environment(request: SetupRequest) -> crate::services::task_service::TaskSnapshot {
     crate::services::task_service::cleanup();
-    crate::services::task_service::start("initialize", "正在初始化 Python 环境", async move {
-        crate::services::setup_service::initialize(request.install_path, request.python_version, request.conda_packages, request.pip_packages).await
+    crate::services::task_service::start("miniconda-install", "正在安装 Miniconda", async move {
+        crate::services::setup_service::initialize(request.install_path).await
     })
 }
 

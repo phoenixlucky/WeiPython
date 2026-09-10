@@ -409,6 +409,36 @@ pub async fn refresh_python(version: String, channel: String) -> Result<Vec<Stri
     search_python_cached(version, channel, true).await
 }
 
+async fn cleanup_stale_conda_transaction_files() -> Result<(), String> {
+    if !cfg!(windows) { return Ok(()); }
+    let program = conda_program().await?;
+    let path = Path::new(&program);
+    let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else { return Ok(()); };
+    if !file_name.eq_ignore_ascii_case("conda.exe") { return Ok(()); }
+    let Some(directory) = path.parent() else { return Ok(()); };
+    let prefix = format!("{file_name}.c~");
+    let trash_prefix = format!("{prefix}.conda_trash").to_ascii_lowercase();
+    let mut entries = tokio::fs::read_dir(directory).await.map_err(|error| format!("读取 Conda 临时文件失败：{error}"))?;
+    while let Some(entry) = entries.next_entry().await.map_err(|error| format!("读取 Conda 临时文件失败：{error}"))? {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.eq_ignore_ascii_case(&prefix) || name.to_ascii_lowercase().starts_with(&trash_prefix) {
+            tokio::fs::remove_file(entry.path()).await.map_err(|error| format!("无法清理 Conda 上次升级残留文件 {}：{error}。请关闭其他 Conda/终端进程后重试。", entry.path().display()))?;
+        }
+    }
+    Ok(())
+}
+
+fn python_upgrade_failure(result: &crate::services::process_service::ProcessOutput) -> String {
+    let detail = failure(result, "Conda Python 升级失败");
+    if detail.contains("splitext") && detail.contains("conda.exe.c~") {
+        "当前 Conda 版本在 Windows 清理升级临时文件时发生已知错误，请先升级 Conda 至 26.7 或更高版本后重试。".into()
+    } else if detail.contains("WinError 5") {
+        "升级 base Python 时没有权限替换 Conda 文件，请关闭其他 Conda/终端进程后以管理员权限重试。".into()
+    } else {
+        detail
+    }
+}
+
 async fn search_python_cached(version: String, channel: String, force_refresh: bool) -> Result<Vec<String>, String> {
     let key = format!("{}::{}", channel.trim(), version.trim());
     if !force_refresh {
@@ -450,8 +480,9 @@ pub async fn upgrade_python(name: String, version: String, channel: String) -> R
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis();
     let backup = export_directory().join(format!("{}-before-upgrade-{timestamp}.yml", safe_file_name(&name)));
     export(name, backup.to_string_lossy().to_string()).await?;
+    cleanup_stale_conda_transaction_files().await?;
     let result = run_conda(&args).await?;
-    if !result.ok { return Err(failure(&result, "升级 Conda 环境 Python 失败")); }
+    if !result.ok { return Err(python_upgrade_failure(&result)); }
     let actual = python_version(Path::new(&existing.prefix)).await;
     let matches = actual == version || (version.split('.').count() < 3 && actual.starts_with(&format!("{version}.")));
     if !matches { return Err(format!("升级后校验失败：期望 {version}，实际 {actual}；备份位于 {}", backup.display())); }
@@ -469,6 +500,7 @@ pub async fn upgrade_conda() -> Result<OperationResult, String> {
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis();
     let backup = export_directory().join(format!("base-before-conda-upgrade-{timestamp}.yml"));
     export("base".into(), backup.to_string_lossy().to_string()).await?;
+    cleanup_stale_conda_transaction_files().await?;
     let result = run_conda(&args).await?;
     if !result.ok { return Err(failure(&result, "升级 Conda 失败")); }
     let after = run_conda(&["--version".into()]).await?;

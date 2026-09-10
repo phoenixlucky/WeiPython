@@ -1,6 +1,5 @@
 use crate::domain::models::{OperationResult, SetupStatus};
 use crate::services::conda_service;
-use crate::services::package_service;
 use crate::services::process_service::{failure, resolve_program, run};
 use std::path::PathBuf;
 
@@ -39,32 +38,18 @@ async fn install_miniconda(path: &str) -> Result<OperationResult, String> {
     Ok(OperationResult { ok: true, message: "Miniconda 安装完成".into(), command: result.command, output: result.stdout })
 }
 
-pub async fn initialize(install_path: String, python_version: String, conda_packages: Vec<String>, pip_packages: Vec<String>) -> Result<OperationResult, String> {
-    let mut logs = Vec::new();
-    if resolve_program("conda").await.is_none() {
-        logs.push(install_miniconda(&install_path).await?.output);
-        let executable = PathBuf::from(&install_path).join("Scripts").join("conda.exe");
-        if !executable.is_file() { return Err("安装结束但未找到 conda.exe".into()); }
-        let mut settings = crate::services::storage_service::read_settings().await?;
-        settings.conda_path = Some(executable.to_string_lossy().to_string());
-        crate::services::storage_service::write_settings(&settings).await?;
+pub async fn initialize(install_path: String) -> Result<OperationResult, String> {
+    let install_path = install_path.trim();
+    if install_path.is_empty() { return Err("Miniconda 安装目录不能为空".into()); }
+    if let Some(path) = resolve_program("conda").await {
+        return Ok(OperationResult { ok: true, message: "已检测到 Conda，无需重复安装".into(), command: path, output: "Conda 已可用".into() });
     }
-    let version = if python_version.trim().is_empty() { "3.14".to_string() } else { python_version };
-    let environment_name = format!("py{}", version.chars().filter(|character| character.is_ascii_digit()).collect::<String>());
-    let mut packages = vec!["ipykernel".to_string()];
-    packages.extend(conda_packages.into_iter());
-    let create = conda_service::create(environment_name.clone(), "python".into(), None, None, true, true, Some(version), Some("conda-forge".into()), packages).await?;
-    logs.push(create.output);
-    // Conda may already be installed outside the requested bootstrap path. Use
-    // the prefix returned by Conda instead of guessing <install_path>\envs\name.
-    let env_path = conda_service::list().await?
-        .into_iter()
-        .find(|environment| environment.name.eq_ignore_ascii_case(&environment_name))
-        .map(|environment| environment.prefix)
-        .ok_or_else(|| format!("创建完成但未找到 Conda 环境 {environment_name} 的实际路径"))?;
-    for package in pip_packages.into_iter().filter(|package| !package.trim().is_empty()) {
-        let result = package_service::execute(crate::domain::models::EnvironmentTarget { target_type: "conda".into(), name: Some(environment_name.clone()), path: Some(env_path.clone()), manager: None }, "install".into(), Some(package), None, None).await?;
-        logs.push(result.output);
-    }
-    Ok(OperationResult { ok: true, message: format!("初始化完成，环境 {environment_name} 已就绪"), command: "conda + pip initialization".into(), output: logs.join("\n\n") })
+
+    let result = install_miniconda(install_path).await?;
+    let executable = PathBuf::from(install_path).join("Scripts").join("conda.exe");
+    if !executable.is_file() { return Err("安装结束但未找到 conda.exe".into()); }
+    let mut settings = crate::services::storage_service::read_settings().await?;
+    settings.conda_path = Some(executable.to_string_lossy().to_string());
+    crate::services::storage_service::write_settings(&settings).await?;
+    Ok(result)
 }
