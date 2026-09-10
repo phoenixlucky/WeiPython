@@ -1,13 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "WJ Python Manager",
-  "version": "3.0.7",
+  "version": "3.1.1",
   "identifier": "com.wjpython.manager",
   "build": {
-    "beforeDevCommand": "npm run frontend:dev",
+    "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "frontendDist": "../frontend/dist",
-    "beforeBuildCommand": "npm run frontend:build"
+    "frontendDist": "../dist",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
@@ -30,14 +30,14 @@
       "nsis"
     ],
     "icon": [
-      "../build/app-icon.ico"
+      "../public/assets/installer/app-icon.ico"
     ],
     "windows": {
       "nsis": {
-        "headerImage": "../build/installerHeader.bmp",
-        "sidebarImage": "../build/installerSidebar.bmp",
-        "installerIcon": "../build/app-icon.ico",
-        "uninstallerIcon": "../build/app-icon.ico",
+        "headerImage": "../public/assets/installer/installer-header.bmp",
+        "sidebarImage": "../public/assets/installer/installer-sidebar.bmp",
+        "installerIcon": "../public/assets/installer/app-icon.ico",
+        "uninstallerIcon": "../public/assets/installer/app-icon.ico",
         "installMode": "both",
         "languages": [
           "English"

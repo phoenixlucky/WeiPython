@@ -95,7 +95,7 @@ async function acceptConfirm() {
 </script>
 
 <template>
-  <section class="content">
+  <section class="content subpage-content packages-page">
     <div class="page-heading">
       <div><span class="eyebrow">// Packages</span><h1>包管理</h1><p>通过目标环境的 pip 执行安装、升级、卸载和查询。</p></div>
       <button class="secondary" :disabled="workspace.busy || !selectedTarget" @click="selectedTarget && workspace.loadPackages(selectedTarget)">刷新包</button>

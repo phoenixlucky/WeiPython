@@ -4,6 +4,7 @@ import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
+  publicDir: fileURLToPath(new URL("./public", import.meta.url)),
   plugins: [vue()],
   clearScreen: false,
   server: {

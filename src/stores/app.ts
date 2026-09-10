@@ -1,6 +1,6 @@
 import { computed, ref } from "vue";
 import { defineStore } from "pinia";
-import { describeError, invokeCommand } from "@/lib/tauri";
+import { describeError, invokeCommand, isTauri } from "@/lib/tauri";
 import type { AppSettings, Overview } from "@/types";
 
 const defaultSettings: AppSettings = {
@@ -26,6 +26,10 @@ export const useAppStore = defineStore("app", () => {
   });
 
   async function refresh() {
+    if (!isTauri) {
+      overview.value = { runtime: { python: "3.14.7", conda: "26.7.2", platform: "Windows" }, environments: overview.value?.environments || [], checkedAt: new Date().toISOString() };
+      return;
+    }
     loading.value = true;
     error.value = "";
     try {
@@ -38,6 +42,10 @@ export const useAppStore = defineStore("app", () => {
   }
 
   async function loadSettings() {
+    if (!isTauri) {
+      settings.value = { ...defaultSettings };
+      return;
+    }
     try {
       settings.value = { ...defaultSettings, ...(await invokeCommand<Partial<AppSettings>>("get_settings")) };
     } catch (cause) {

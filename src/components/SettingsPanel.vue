@@ -7,10 +7,10 @@ import { describeError } from "@/lib/tauri";
 const app = useAppStore();
 const wallpaperError = ref("");
 const importingWallpaper = ref(false);
-const defaultWallpaper = "/bg-v2.webp";
+const defaultWallpaper = "/assets/backgrounds/dashboard-waves.webp";
 const builtInWallpapers = [
   { name: "科技蓝", path: defaultWallpaper, value: "" },
-  { name: "樱花", path: "/bg.webp", value: "/bg.webp" },
+  { name: "樱花", path: "/assets/backgrounds/sakura.webp", value: "/assets/backgrounds/sakura.webp" },
 ];
 
 function selectWallpaper(value: string) {
@@ -56,7 +56,7 @@ function resetAppearance() {
 </script>
 
 <template>
-  <section class="content">
+  <section class="content subpage-content settings-page">
     <div class="page-heading">
       <div><span class="eyebrow">// Client Settings</span><h1>客户端设置</h1><p>设置保存在本机应用数据目录，不经过网络。</p></div>
       <button class="secondary" @click="resetAppearance">恢复默认外观</button>

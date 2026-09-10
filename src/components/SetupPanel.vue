@@ -55,7 +55,7 @@ onMounted(refresh);
 </script>
 
 <template>
-  <section class="content">
+  <section class="content subpage-content setup-page">
     <div class="page-heading"><div><span class="eyebrow">// First-run Setup</span><h1>新电脑初始化配置</h1><p>检测现有 Conda；缺失时安装最新版 Miniconda，不创建 Conda 环境。</p></div><button class="secondary" :disabled="workspace.busy" @click="refresh">重新检测</button></div>
     <div class="setup-layout">
       <article class="card form-card accent-card">

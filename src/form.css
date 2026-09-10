@@ -288,6 +288,38 @@
   white-space: nowrap;
 }
 
+.check-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  padding: 13px 14px;
+  border: 1px solid #e5edf6;
+  border-radius: 11px;
+  background: #f8fbff;
+}
+
+.check-row > span {
+  padding-top: 1px;
+  color: #7d8999;
+  font-size: 12px;
+}
+
+.check-row > strong {
+  min-width: 0;
+  color: #1e3a63;
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.check-row .path-value {
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 1100px) {
   .setup-layout {
     grid-template-columns: 1fr;
@@ -921,6 +953,127 @@
 
 .scan-panel .hint {
   margin: 0;
+}
+
+/* Inventory rows use a different structure from the dashboard table. */
+.list-search input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #dce7f3;
+  border-radius: 9px;
+  padding: 10px 11px;
+  color: #172033;
+  background: #fbfdff;
+  outline: none;
+}
+
+.list-search input:focus {
+  border-color: #79a9f8;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .08);
+}
+
+.workspace-columns > .card .environment-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) minmax(76px, auto) 58px 58px;
+  align-items: center;
+  column-gap: 14px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 9px 0;
+}
+
+.env-avatar {
+  display: grid;
+  width: 44px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  font: 600 11px/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.env-main,
+.env-meta {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.env-main strong,
+.env-main span,
+.env-meta strong,
+.env-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-main strong {
+  color: #102451;
+  font-size: 13px;
+}
+
+.env-main span {
+  color: #7d8999;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.env-meta strong {
+  color: #334d73;
+  font-size: 12px;
+}
+
+.env-meta span {
+  color: #8a96a7;
+  font-size: 11px;
+}
+
+.workspace-columns > .card .copy-button,
+.workspace-columns > .card .text-danger {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.text-danger {
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 11px;
+  background: #fff7f7;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.text-danger:hover {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.workspace-columns > .card .uv-installation {
+  grid-template-columns: 54px minmax(0, 1fr) 58px 52px;
+}
+
+/* The top workspace bar sits over the visual shell as a quiet glass layer. */
+.topbar {
+  position: relative;
+  z-index: 4;
+  background: rgba(255, 255, 255, .58);
+  border-bottom-color: rgba(203, 218, 235, .78);
+  box-shadow: 0 8px 24px rgba(36, 78, 125, .06);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+
+@media (max-width: 1100px) {
+  .workspace-columns > .card .environment-row {
+    grid-template-columns: 46px minmax(0, 1fr) 76px 52px 52px;
+    column-gap: 8px;
+  }
+
+  .workspace-columns > .card .uv-installation {
+    grid-template-columns: 46px minmax(0, 1fr) 52px 46px;
+  }
 }
 
 @media (max-width: 900px) {

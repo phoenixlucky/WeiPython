@@ -80,7 +80,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section class="content">
+  <section class="content subpage-content python-page">
     <div class="page-heading">
       <div><span class="eyebrow">// Python</span><h1>Python 版本</h1><p>扫描本机解释器，按版本查询 Conda 包，并管理已登记的 Python 环境。</p></div>
       <button class="secondary" :disabled="workspace.busy" @click="workspace.loadPythonVersions">重新扫描</button>

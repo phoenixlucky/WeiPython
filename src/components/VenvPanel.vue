@@ -120,7 +120,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <section class="content">
+  <section class="content subpage-content venv-page">
     <div class="page-heading">
       <div><span class="eyebrow">// Virtual Environments</span><h1>虚拟环境</h1><p>使用 Python 标准库或 uv 创建和维护虚拟环境。</p></div>
       <div class="button-grid"><button class="secondary" :disabled="workspace.busy" @click="Promise.all([workspace.loadVenvs(), workspace.loadPythonVersions()])">刷新</button><button class="secondary" :disabled="workspace.busy" @click="showScanPanel = !showScanPanel">{{ showScanPanel ? "收起扫描" : "扫描目录" }}</button></div>

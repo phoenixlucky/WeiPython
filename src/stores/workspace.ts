@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from "vue";
 import { defineStore } from "pinia";
-import { describeError, invokeCommand } from "@/lib/tauri";
+import { describeError, invokeCommand, isTauri } from "@/lib/tauri";
 import type { ActiveProcess, CondaEnvironment, EnvironmentTarget, OperationResult, PackageInfo, TaskSnapshot, VirtualEnvironment } from "@/types";
 
 export const useWorkspaceStore = defineStore("workspace", () => {
@@ -38,9 +38,9 @@ export const useWorkspaceStore = defineStore("workspace", () => {
     output.value = [result.command, result.output].filter(Boolean).join("\n\n");
   }
 
-  async function loadConda() { const value = await run(() => invokeCommand<CondaEnvironment[]>("list_conda_environments")); if (value) conda.value = value; }
-  async function loadVenvs(lastDirectory = "") { const value = await run(() => invokeCommand<VirtualEnvironment[]>("list_virtual_environments", { lastDirectory: lastDirectory.trim() || null })); if (value) venvs.value = value; }
-  async function loadPythonVersions() { const value = await run(() => invokeCommand<string[]>("discover_python_versions")); if (value) pythonVersions.value = value; }
+  async function loadConda() { if (!isTauri) return; const value = await run(() => invokeCommand<CondaEnvironment[]>("list_conda_environments")); if (value) conda.value = value; }
+  async function loadVenvs(lastDirectory = "") { if (!isTauri) return; const value = await run(() => invokeCommand<VirtualEnvironment[]>("list_virtual_environments", { lastDirectory: lastDirectory.trim() || null })); if (value) venvs.value = value; }
+  async function loadPythonVersions() { if (!isTauri) return; const value = await run(() => invokeCommand<string[]>("discover_python_versions")); if (value) pythonVersions.value = value; }
   async function uninstallPython(path: string) { const task = await runTask(() => invokeCommand<TaskSnapshot>("start_uninstall_python", { path })); if (task?.status === "completed") await refreshAll(); }
   async function startSystemPythonUpgrade(path: string) { const task = await runTask(() => invokeCommand<TaskSnapshot>("start_upgrade_python", { path })); if (task?.status === "completed") await loadPythonVersions(); }
   async function createConda(payload: Record<string, unknown>) { const value = await run(() => invokeCommand<OperationResult>("create_conda_environment", { request: payload })); if (value) { showResult(value); await loadConda(); } }
@@ -57,7 +57,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   async function importUvEnvironment(environmentPath: string, filePath: string) { const task = await runTask(() => invokeCommand<TaskSnapshot>("start_import_uv_environment", { request: { environmentPath, filePath } })); return task; }
   async function deleteVenv(path: string) { const value = await run(() => invokeCommand<OperationResult>("delete_virtual_environment", { path })); if (value) { showResult(value); await loadVenvs(); } }
   async function loadPackages(target: EnvironmentTarget) { selectedTarget.value = target; const value = await run(() => invokeCommand<PackageInfo[]>("list_packages", { target })); if (value) packages.value = value; }
-  async function loadProcesses() { activeProcesses.value = await invokeCommand<ActiveProcess[]>("get_active_processes"); }
+  async function loadProcesses() { if (!isTauri) return; activeProcesses.value = await invokeCommand<ActiveProcess[]>("get_active_processes"); }
   const delay = (milliseconds: number) => new Promise((resolve) => window.setTimeout(resolve, milliseconds));
   async function waitForTask(initial: TaskSnapshot): Promise<TaskSnapshot> {
     let task = initial;

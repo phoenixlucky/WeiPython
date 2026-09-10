@@ -105,7 +105,7 @@ onMounted(refresh);
 </script>
 
 <template>
-  <section class="content">
+  <section class="content subpage-content uv-page">
     <div class="page-heading">
       <div><span class="eyebrow">// uv Manager</span><h1>uv 管理</h1><p>独立管理 uv 的检测、安装、指定版本安装和卸载。</p></div>
       <button class="secondary" :disabled="loading || workspace.busy" @click="refresh">重新检测</button>
@@ -127,8 +127,8 @@ onMounted(refresh);
       </article>
       <article class="card setup-card">
         <div class="card-heading"><div><span class="eyebrow">Status</span><h2>当前状态</h2></div><span>{{ status.path ? "已安装" : "未安装" }}</span></div>
-        <div class="check-row"><span>版本</span><strong>{{ status.version || "-" }}</strong></div>
-        <div class="check-row"><span>路径</span><strong class="path-value">{{ status.path || "未检测到 uv" }}</strong></div>
+        <div class="check-row"><span>版本</span><strong :title="status.version || '-'">{{ status.version || "-" }}</strong></div>
+        <div class="check-row"><span>路径</span><strong class="path-value" :title="status.path || '未检测到 uv'">{{ status.path || "未检测到 uv" }}</strong></div>
         <p class="hint">卸载按钮只移除本程序识别的用户级安装目录，不会删除系统或其他包管理器安装的 uv。</p>
       </article>
       <article class="card setup-card">
