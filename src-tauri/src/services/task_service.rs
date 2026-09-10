@@ -47,6 +47,14 @@ pub fn append_output(value: &str) {
     });
 }
 
+pub fn set_output(value: &str) {
+    let _ = CURRENT_TASK.try_with(|context| {
+        if let Ok(mut task) = context.snapshot.lock() {
+            task.output = value.to_string();
+        }
+    });
+}
+
 pub fn current_task_id() -> Option<String> { CURRENT_TASK.try_with(|context| context.task_id.clone()).ok() }
 pub fn is_cancelled() -> bool { CURRENT_TASK.try_with(|context| context.cancel.load(Ordering::Relaxed)).unwrap_or(false) }
 

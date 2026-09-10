@@ -176,6 +176,9 @@ pub async fn export_all_conda_environments(request: CondaExportAllRequest) -> Re
 pub async fn upgrade_conda() -> Result<OperationResult, String> { crate::services::conda_service::upgrade_conda().await }
 
 #[tauri::command]
+pub async fn accept_conda_tos() -> Result<OperationResult, String> { crate::services::conda_service::accept_conda_tos().await }
+
+#[tauri::command]
 pub fn start_upgrade_conda() -> crate::services::task_service::TaskSnapshot {
     crate::services::task_service::cleanup();
     crate::services::task_service::start("conda-upgrade", "正在升级 Conda 核心", async {

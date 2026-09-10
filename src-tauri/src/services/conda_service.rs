@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
+const ANACONDA_DEFAULT_CHANNELS: [&str; 3] = [
+    "https://repo.anaconda.com/pkgs/main",
+    "https://repo.anaconda.com/pkgs/r",
+    "https://repo.anaconda.com/pkgs/msys2",
+];
+
 #[derive(Debug, Deserialize)]
 struct CondaEnvironmentList {
     envs: Vec<String>,
@@ -173,7 +179,8 @@ pub async fn list() -> Result<Vec<CondaEnvironment>, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_environment_list, parse_json_value, rewrite_clone_yaml};
+    use super::{is_conda_tos_error, parse_environment_list, parse_json_value, rewrite_clone_yaml};
+    use crate::services::process_service::ProcessOutput;
 
     #[test]
     fn parses_json_from_stderr_when_stdout_is_empty() {
@@ -218,6 +225,12 @@ mod tests {
     fn version_search_accepts_diagnostic_prefix() {
         let value = parse_json_value("warning: plugin\n{\"python\":[]}", "").unwrap();
         assert!(value.get("python").is_some());
+    }
+
+    #[test]
+    fn detects_noninteractive_conda_tos_failure() {
+        let output = ProcessOutput { ok: false, stdout: String::new(), stderr: "CondaToSNonInteractiveError: Terms of Service have not been accepted".into(), command: "conda install".into() };
+        assert!(is_conda_tos_error(&output));
     }
 
     #[tokio::test]
@@ -495,7 +508,14 @@ pub async fn upgrade_conda() -> Result<OperationResult, String> {
     let args = vec!["install".into(), "-n".into(), "base".into(), "-c".into(), "defaults".into(), "conda".into(), "-y".into()];
     let mut dry_run = args.clone(); dry_run.push("--dry-run".into());
     let check = run_conda(&dry_run).await?;
-    if !check.ok { return Err(failure(&check, "Conda 升级依赖检查失败")); }
+    if !check.ok {
+        if is_conda_tos_error(&check) {
+            crate::services::task_service::set_output("需要先接受 Anaconda 官方软件源的服务条款。请在应用中确认后继续。");
+            return Err("需要先接受 Anaconda 官方软件源的服务条款。确认后可继续升级。".into());
+        }
+        return Err(failure(&check, "Conda 升级依赖检查失败"));
+    }
+
     tokio::fs::create_dir_all(export_directory()).await.map_err(|e| e.to_string())?;
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis();
     let backup = export_directory().join(format!("base-before-conda-upgrade-{timestamp}.yml"));
@@ -506,4 +526,25 @@ pub async fn upgrade_conda() -> Result<OperationResult, String> {
     let after = run_conda(&["--version".into()]).await?;
     let output = [result.stdout, result.stderr, format!("升级前：{}", before.stdout), format!("升级后：{}", after.stdout), format!("备份：{}", backup.display())].into_iter().filter(|value| !value.is_empty()).collect::<Vec<_>>().join("\n");
     Ok(OperationResult { ok: true, message: "Conda 核心包升级完成".into(), command: result.command, output })
+}
+
+pub async fn accept_conda_tos() -> Result<OperationResult, String> {
+    let mut outputs = Vec::new();
+    for channel in ANACONDA_DEFAULT_CHANNELS {
+        let args = vec!["tos".into(), "accept".into(), "--override-channels".into(), "--channel".into(), channel.into()];
+        let result = run_conda(&args).await?;
+        if !result.ok { return Err(failure(&result, "接受 Anaconda 软件源条款失败")); }
+        outputs.extend([result.stdout, result.stderr].into_iter().filter(|value| !value.trim().is_empty()));
+    }
+    Ok(OperationResult {
+        ok: true,
+        message: "Anaconda 官方软件源条款已接受，可以继续升级 Conda".into(),
+        command: "conda tos accept --override-channels".into(),
+        output: outputs.join("\n"),
+    })
+}
+
+fn is_conda_tos_error(output: &crate::services::process_service::ProcessOutput) -> bool {
+    let text = format!("{}\n{}", output.stdout, output.stderr).to_ascii_lowercase();
+    text.contains("condatosnoninteractiveerror") || text.contains("terms of service have not been accepted")
 }

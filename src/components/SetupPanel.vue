@@ -4,11 +4,13 @@ import { describeError, invokeCommand } from "@/lib/tauri";
 import { chooseDirectory } from "@/lib/dialog";
 import { useAppStore } from "@/stores/app";
 import { useWorkspaceStore } from "@/stores/workspace";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const app = useAppStore();
 const workspace = useWorkspaceStore();
 const status = ref<SetupStatus | null>(null);
 const form = reactive({ installPath: "" });
+const showCondaTosConfirm = ref(false);
 const steps = [
   { label: "检测电脑上的 Conda", progress: 10 },
   { label: "下载并安装最新版 Miniconda", progress: 30 },
@@ -49,6 +51,15 @@ async function chooseInstallDirectory() {
 async function upgradeConda() {
   const task = await workspace.upgradeConda();
   if (task?.status === "completed") await refresh();
+  else if (task?.status === "failed" && workspace.error.includes("需要先接受 Anaconda 官方软件源条款")) showCondaTosConfirm.value = true;
+}
+
+async function acceptCondaTosAndUpgrade() {
+  showCondaTosConfirm.value = false;
+  if (await workspace.acceptCondaTos()) {
+    const task = await workspace.upgradeConda();
+    if (task?.status === "completed") await refresh();
+  }
 }
 
 onMounted(refresh);
@@ -71,4 +82,5 @@ onMounted(refresh);
       </div>
     </div>
   </section>
+  <ConfirmDialog v-if="showCondaTosConfirm" :open="true" title="需要接受 Anaconda 官方软件源条款" message="本次升级需要访问 Anaconda defaults 软件源。只有在你同意相关服务条款后，程序才会接受条款并继续升级。" confirm-label="接受条款并继续" @confirm="acceptCondaTosAndUpgrade" @cancel="showCondaTosConfirm = false" />
 </template>

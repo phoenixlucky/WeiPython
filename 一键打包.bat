@@ -8,6 +8,42 @@ set "PROJECT_ROOT=%~dp0"
 cd /d "%PROJECT_ROOT%"
 title WJ Python Manager Tauri Builder
 
+echo [INFO] Checking Node.js and npm ...
+node --version >nul 2>&1
+if errorlevel 1 (
+  echo [ERROR] Node.js 24 or newer is required.
+  pause
+  exit /b 1
+)
+call npm --version >nul 2>&1
+if errorlevel 1 (
+  echo [ERROR] npm is required. Please install Node.js 24 or newer.
+  pause
+  exit /b 1
+)
+if not exist package.json (
+  echo [ERROR] package.json not found in the project root.
+  pause
+  exit /b 1
+)
+
+echo [INFO] Checking installed npm dependencies ...
+call npm ls --depth=0 >nul 2>&1
+if errorlevel 1 (
+  if exist package-lock.json (
+    echo [INFO] Dependencies are missing or incomplete. Running npm ci ...
+    call npm ci
+  ) else (
+    echo [INFO] Dependencies are missing or incomplete. Running npm install ...
+    call npm install
+  )
+  if errorlevel 1 (
+    echo [ERROR] Could not install npm dependencies.
+    pause
+    exit /b 1
+  )
+)
+
 echo ============================================================
 echo    WJ Python Manager Tauri Builder
 echo ============================================================
@@ -41,16 +77,6 @@ if not "!NEW_VERSION!"=="" (
   )
   set "CUR_VERSION=!NEW_VERSION!"
   echo.
-)
-
-if not exist node_modules\@tauri-apps\cli (
-  echo [INFO] Tauri CLI not found. Running npm install ...
-  call npm install
-  if errorlevel 1 (
-    echo [ERROR] npm install failed.
-    pause
-    exit /b 1
-  )
 )
 
 echo ============================================================

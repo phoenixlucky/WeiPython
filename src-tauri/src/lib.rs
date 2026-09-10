@@ -36,6 +36,7 @@ pub fn run() {
             commands::start_uninstall_uv_python,
             commands::export_all_conda_environments,
             commands::upgrade_conda,
+            commands::accept_conda_tos,
             commands::start_upgrade_conda,
             commands::import_conda_environment,
             commands::search_conda_python_versions,
