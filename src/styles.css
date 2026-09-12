@@ -9,6 +9,47 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 1120px; min-height: 100vh; background: #eef5fb; }
 button, input, select { font: inherit; }
+
+/* Shared dropdown treatment across every management page. */
+select {
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 40px 10px 13px;
+  border: 1px solid #d5e3f2;
+  border-radius: 12px;
+  color: #172033;
+  background-color: #fafdff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none'%3E%3Cpath d='m4 6 4 4 4-4' stroke='%235d7da7' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  background-size: 16px 16px;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+  transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+}
+
+select:hover {
+  border-color: #a9c8ee;
+  background-color: #fff;
+}
+
+select:focus-visible {
+  border-color: var(--client-primary, #2563eb);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+}
+
+select:disabled {
+  color: #8da0b8;
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+  opacity: .78;
+}
+
+select option {
+  color: #172033;
+  background: #fff;
+}
 button { cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
 .app-shell { display: flex; min-height: 100vh; }
@@ -127,4 +168,31 @@ button:disabled { cursor: wait; opacity: .65; }
   .uv-page .workspace-columns { grid-template-columns: 1fr; }
   .conda-page .workspace-columns > .tools-card,
   .uv-page .workspace-columns > :nth-child(5) { grid-column: auto; }
+}
+
+/* Form-specific rules above are intentionally kept in sync with the shared select. */
+.form-card select,
+.inline-tools select {
+  padding: 10px 40px 10px 13px;
+  border: 1px solid #d5e3f2;
+  border-radius: 12px;
+  background-color: #fafdff;
+}
+
+.form-card select:hover,
+.inline-tools select:hover {
+  border-color: #a9c8ee;
+  background-color: #fff;
+}
+
+.form-card select:focus-visible,
+.inline-tools select:focus-visible {
+  border-color: var(--client-primary, #2563eb);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+}
+
+.form-card select:disabled,
+.inline-tools select:disabled {
+  color: #8da0b8;
+  background-color: #f1f5f9;
 }
