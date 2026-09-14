@@ -15,6 +15,11 @@ import { isTauri } from "@/lib/tauri";
 const app = useAppStore();
 const workspace = useWorkspaceStore();
 const activePanel = ref("overview");
+const showMembershipModal = ref(false);
+const ssvipEnabled = ref(false);
+const activeSkin = ref("nebula");
+const activationKey = ref("");
+const activationError = ref("");
 const panels = [
   { id: "overview", icon: "ph:house-fill", label: "概览" },
   { id: "setup", icon: "ph:gear", label: "初始化配置" },
@@ -46,6 +51,17 @@ let processTimer = 0;
 
 function panelFor(id: string) { return panels.find((panel) => panel.id === id); }
 
+function activateSsvip(skin = activeSkin.value) {
+  if (!ssvipEnabled.value && activationKey.value.trim() !== "greed is good") {
+    activationError.value = "激活秘钥不正确，请输入有效的付费激活秘钥。";
+    return;
+  }
+  activeSkin.value = skin;
+  ssvipEnabled.value = true;
+  activationError.value = "";
+  showMembershipModal.value = false;
+}
+
 onMounted(async () => {
   await app.loadSettings();
   if (isTauri) {
@@ -65,7 +81,7 @@ onUnmounted(() => { if (processTimer) window.clearInterval(processTimer); });
 </script>
 
 <template>
-  <div class="app-shell" :class="{ compact: app.settings.compactMode }" :style="{ '--client-primary': app.settings.primary, '--client-secondary': app.settings.secondary, '--client-ink': app.settings.ink }">
+  <div class="app-shell" :class="{ compact: app.settings.compactMode, 'ssvip-shell': ssvipEnabled, 'skin-nebula': activeSkin === 'nebula', 'skin-aurora': activeSkin === 'aurora' }" :style="{ '--client-primary': app.settings.primary, '--client-secondary': app.settings.secondary, '--client-ink': app.settings.ink }">
     <aside class="sidebar">
       <div class="brand-block">
         <div class="brand-mark"><span class="brand-icon"><Icon class="brand-logo" icon="logos:python" /></span><span class="brand-copy"><strong>WJ Python</strong><small>管理大师</small></span></div>
@@ -79,6 +95,11 @@ onUnmounted(() => { if (processTimer) window.clearInterval(processTimer); });
           </button>
         </nav>
       </div>
+      <button class="ssvip-entry" :class="{ enabled: ssvipEnabled }" @click="showMembershipModal = true">
+        <span class="ssvip-entry-orbit"><Icon icon="ph:crown-fill" /></span>
+        <span class="ssvip-entry-copy"><strong>SSVIP</strong><small>{{ ssvipEnabled ? "专属体验已开启" : "解锁尊享特效" }}</small></span>
+        <span class="ssvip-entry-price">¥9999<small>/年</small></span>
+      </button>
       <div class="sidebar-foot"><span class="status-dot" :class="{ busy: app.loading }"></span><span>{{ app.loading ? "读取中" : "系统就绪" }}</span><small>本地运行</small></div>
     </aside>
 
@@ -125,6 +146,39 @@ onUnmounted(() => { if (processTimer) window.clearInterval(processTimer); });
       <section v-else class="content placeholder-page"><span class="eyebrow">// {{ activePanel }}</span><h1>{{ panelFor(activePanel)?.label }}</h1><div class="card"><h2>模块已接入迁移骨架</h2><p>这里将接入 Rust domain/service 能力。当前基础链路已可运行。</p><button class="secondary" @click="activePanel = 'overview'">返回概览</button></div></section>
       <div v-if="workspace.error || workspace.message || workspace.output || workspace.currentTask" class="operation-log" :class="{ 'operation-error': workspace.error, 'operation-running': workspace.currentTask?.status === 'running' }" role="status" aria-live="polite"><div class="log-head"><span class="log-status-dot"></span><strong>{{ workspace.error || workspace.message || workspace.currentTask?.message || "最近一次操作" }}</strong><span v-if="workspace.currentTask?.status === 'running'">{{ workspace.currentTask.progress }}%</span><button v-if="workspace.currentTask?.status === 'running'" class="link-button" @click="workspace.cancelCurrentTask">取消任务</button><button class="link-button" @click="workspace.clearLog">清空</button></div><div v-if="workspace.currentTask?.status === 'running'" class="task-progress"><span :style="{ width: `${workspace.currentTask.progress}%` }"></span></div><small v-if="workspace.activeProcesses.length" class="process-note">正在运行 {{ workspace.activeProcesses.length }} 个本地进程</small><pre v-if="workspace.output">{{ workspace.output }}</pre></div>
     </main>
+
+    <div v-if="showMembershipModal" class="membership-backdrop" role="presentation" @click.self="showMembershipModal = false">
+      <section class="membership-modal" role="dialog" aria-modal="true" aria-labelledby="ssvip-title">
+        <button class="membership-close" aria-label="关闭 SSVIP 介绍" @click="showMembershipModal = false"><Icon icon="ph:x" /></button>
+        <div class="membership-hero">
+          <span class="membership-kicker"><Icon icon="ph:sparkle-fill" /> WJ PYTHON PRIVATE CLUB</span>
+          <div class="membership-crown"><Icon icon="ph:crown-fill" /></div>
+          <h2 id="ssvip-title">SSVIP 年度尊享版</h2>
+          <p>让每一次环境管理，都拥有旗舰级的光感与秩序。</p>
+          <strong class="membership-price">¥9999<small>/年</small></strong>
+        </div>
+        <div class="membership-body">
+          <div class="membership-benefits">
+            <span><Icon icon="ph:lightning-fill" /> 全局能量光效</span>
+            <span><Icon icon="ph:palette-fill" /> 两套专属皮肤</span>
+            <span><Icon icon="ph:seal-check-fill" /> SSVIP 专属标识</span>
+          </div>
+          <div class="skin-heading"><strong>选择专属皮肤</strong><small>立即预览工作区氛围</small></div>
+          <div class="skin-options">
+            <button class="skin-option skin-option-nebula" :class="{ selected: activeSkin === 'nebula' }" @click="activeSkin = 'nebula'">
+              <span class="skin-preview"><i></i><i></i><i></i></span><span><strong>星尘紫金</strong><small>深空 · 奢华</small></span><Icon v-if="activeSkin === 'nebula'" class="skin-check" icon="ph:check-circle-fill" />
+            </button>
+            <button class="skin-option skin-option-aurora" :class="{ selected: activeSkin === 'aurora' }" @click="activeSkin = 'aurora'">
+              <span class="skin-preview"><i></i><i></i><i></i></span><span><strong>极光绛蓝</strong><small>流光 · 未来</small></span><Icon v-if="activeSkin === 'aurora'" class="skin-check" icon="ph:check-circle-fill" />
+            </button>
+          </div>
+          <label class="membership-key-field" for="ssvip-key"><span><strong>付费激活秘钥</strong><small>输入秘钥后开启全部 SSVIP 特效</small></span><div class="membership-key-input"><Icon icon="ph:key-fill" /><input id="ssvip-key" v-model="activationKey" type="password" autocomplete="off" placeholder="请输入激活秘钥" @input="activationError = ''" /></div></label>
+          <small v-if="activationError" class="membership-key-error" role="alert">{{ activationError }}</small>
+          <button class="membership-activate" @click="activateSsvip()"><Icon icon="ph:sparkle-fill" />{{ ssvipEnabled ? "保存并继续体验" : "使用秘钥开启 SSVIP" }}</button>
+          <small class="membership-note">SSVIP 年费 ¥9999 / 年 · 激活后可随时切换专属皮肤。</small>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
