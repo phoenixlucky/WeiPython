@@ -204,13 +204,14 @@ button:disabled { cursor: wait; opacity: .65; }
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 72px;
   margin-top: auto;
   padding: 11px 10px;
   overflow: hidden;
   border: 1px solid rgba(187, 132, 255, .38);
   border-radius: 15px;
-  color: #fff;
-  background: linear-gradient(135deg, #27134f, #552277 48%, #8f4cb4);
+  color: #fff !important;
+  background: linear-gradient(135deg, #21113f 0%, #4f206f 54%, #8b45aa 100%) !important;
   box-shadow: 0 12px 24px rgba(97, 40, 150, .24);
   text-align: left;
   transition: transform .22s ease, box-shadow .22s ease;
@@ -243,10 +244,10 @@ button:disabled { cursor: wait; opacity: .65; }
   box-shadow: 0 0 15px rgba(255, 210, 99, .36);
 }
 .ssvip-entry-orbit .iconify { width: 18px; height: 18px; }
-.ssvip-entry-copy { position: relative; z-index: 1; display: grid; gap: 3px; min-width: 0; }
-.ssvip-entry-copy strong { color: #ffe7a3; font-size: 14px; letter-spacing: .12em; }
-.ssvip-entry-copy small { overflow: hidden; color: rgba(255,255,255,.72); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.ssvip-entry-price { position: relative; z-index: 1; margin-left: auto; color: #fff; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.ssvip-entry-copy { position: relative; z-index: 1; display: grid; flex: 1; gap: 3px; min-width: 0; }
+.ssvip-entry-copy strong { color: #ffe7a3 !important; font-size: 14px; letter-spacing: .12em; }
+.ssvip-entry-copy small { overflow: hidden; color: rgba(255,255,255,.72) !important; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.ssvip-entry-price { position: relative; z-index: 1; display: grid; justify-items: end; gap: 1px; margin-left: auto; color: #fff !important; font-size: 12px; font-weight: 700; line-height: 1.1; white-space: nowrap; }
 .ssvip-entry-price small { color: rgba(255,255,255,.68); font-size: 9px; font-weight: 400; }
 .ssvip-entry.enabled { border-color: rgba(255, 225, 134, .72); animation: ssvip-entry-glow 2.8s ease-in-out infinite; }
 @keyframes ssvip-entry-glow { 50% { box-shadow: 0 12px 28px rgba(177, 93, 255, .38), 0 0 0 1px rgba(255, 224, 134, .18); } }
@@ -299,7 +300,7 @@ button:disabled { cursor: wait; opacity: .65; }
 @keyframes ssvip-badge-float { 50% { transform: translate(-50%, -3px); opacity: .72; } }
 
 .skin-aurora { --ssvip-accent: #46cde8; --ssvip-gold: #ffc16d; }
-.skin-aurora .ssvip-entry { background: linear-gradient(135deg, #082d56, #095b7b 48%, #1f9a96); }
+.skin-aurora .ssvip-entry { background: linear-gradient(135deg, #082d56, #095b7b 48%, #1f9a96) !important; }
 .skin-aurora .hero-panel { background-image: linear-gradient(100deg, rgba(4, 34, 84, .32), rgba(0, 125, 139, .18)), var(--hero-image); }
 .skin-aurora .hero-panel::before { background: linear-gradient(120deg, rgba(0, 38, 102, .3), rgba(0, 194, 180, .14)); }
 .skin-aurora .section-icon { color: #0794b8; background: #e6fbff; }
