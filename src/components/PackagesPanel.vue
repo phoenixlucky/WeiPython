@@ -5,7 +5,7 @@ import { useWorkspaceStore } from "@/stores/workspace";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const workspace = useWorkspaceStore();
-const form = reactive({ targetKey: "", packageName: "", indexUrl: "https://pypi.org/simple", requirementsPath: "", recommendedPackages: ["numpy", "pandas", "openpyxl", "openai", "loguru"] });
+const form = reactive({ targetKey: "", packageName: "", versionChoice: "latest", packageVersion: "", indexUrl: "https://pypi.org/simple", requirementsPath: "", recommendedPackages: ["numpy", "pandas", "openpyxl", "openai", "loguru"] });
 const showAdvanced = ref(false);
 const searchQuery = ref("");
 const confirmRequest = ref<{ title: string; message: string; confirmLabel: string; action: () => Promise<void> } | null>(null);
@@ -31,6 +31,17 @@ const recommendedCatalog = [
   { id: "wei-data-shu[excel-client]", label: "wei-data-shu[excel-client]", description: "通过本机 Excel 应用操作工作簿和宏" },
 ];
 const selectedTarget = computed(() => workspace.targets.find((target) => JSON.stringify(target) === form.targetKey));
+const selectedPackageVersion = computed(() => {
+  const packageName = form.packageName.trim().toLowerCase();
+  if (!packageName) return "";
+  return workspace.packages.find((item) => item.name.toLowerCase() === packageName)?.version ?? "";
+});
+const installVersion = computed(() => {
+  if (form.versionChoice === "custom") return form.packageVersion.trim();
+  if (form.versionChoice === "installed") return selectedPackageVersion.value;
+  return "";
+});
+const versionError = computed(() => form.versionChoice === "custom" && !form.packageVersion.trim() ? "请输入要安装的版本号" : "");
 const filteredPackages = computed(() => {
   const query = searchQuery.value.trim().toLowerCase();
   if (!query) return workspace.packages;
@@ -45,9 +56,13 @@ watch(selectedTarget, (target) => {
   if (target) void workspace.loadPackages(target);
 });
 
+watch(selectedPackageVersion, (version) => {
+  if (!version && form.versionChoice === "installed") form.versionChoice = "latest";
+});
+
 async function action(actionName: string) {
   if (selectedTarget.value) {
-    await workspace.packageAction({ target: selectedTarget.value, action: actionName, packageName: form.packageName, indexUrl: form.indexUrl, requirementsPath: form.requirementsPath });
+    await workspace.packageAction({ target: selectedTarget.value, action: actionName, packageName: form.packageName, packageVersion: installVersion.value || undefined, indexUrl: form.indexUrl, requirementsPath: form.requirementsPath });
   }
 }
 
@@ -106,8 +121,19 @@ async function acceptConfirm() {
         <label>目标环境<select v-model="form.targetKey"><option value="" disabled>选择环境</option><option v-for="target in workspace.targets" :key="JSON.stringify(target)" :value="JSON.stringify(target)">{{ target.targetType }} / {{ target.name }}</option></select></label>
         <p v-if="selectedTarget" class="target-context">当前操作：<strong>{{ selectedTarget.targetType }} / {{ selectedTarget.name }}</strong></p>
         <label>包名<input v-model="form.packageName" placeholder="numpy" /></label>
+        <div class="package-version-field">
+          <label for="package-version-choice">版本</label>
+          <select id="package-version-choice" v-model="form.versionChoice" :disabled="workspace.busy">
+            <option value="latest">不指定版本（安装最新）</option>
+            <option v-if="selectedPackageVersion" value="installed">当前已安装版本（{{ selectedPackageVersion }}）</option>
+            <option value="custom">手动输入版本</option>
+          </select>
+          <input v-if="form.versionChoice === 'custom'" id="package-version-input" v-model="form.packageVersion" aria-describedby="package-version-help package-version-error" :aria-invalid="Boolean(versionError)" :disabled="workspace.busy" placeholder="例如 2.2.3" />
+          <small id="package-version-help" class="hint">可选择当前版本，也可以手动输入版本号；不指定时安装最新版本。</small>
+          <small v-if="versionError" id="package-version-error" class="field-error" role="alert">{{ versionError }}</small>
+        </div>
         <div class="package-primary-actions">
-          <button class="primary" :disabled="workspace.busy || !form.packageName" @click="action('install')">安装</button>
+          <button class="primary" :disabled="workspace.busy || !form.packageName || Boolean(versionError)" @click="action('install')">安装</button>
           <button class="secondary" :disabled="workspace.busy || !form.packageName" @click="action('upgrade')">升级</button>
           <button class="danger-action" :disabled="workspace.busy || !form.packageName" @click="uninstallPackage">卸载</button>
         </div>

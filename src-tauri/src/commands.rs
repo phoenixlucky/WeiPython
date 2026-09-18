@@ -48,6 +48,7 @@ pub struct PackageActionRequest {
     pub target: EnvironmentTarget,
     pub action: String,
     pub package_name: Option<String>,
+    pub package_version: Option<String>,
     pub index_url: Option<String>,
     pub requirements_path: Option<String>,
 }
@@ -244,13 +245,13 @@ pub async fn list_packages(target: EnvironmentTarget) -> Result<Vec<Package>, St
 
 #[tauri::command]
 pub async fn package_action(request: PackageActionRequest) -> Result<OperationResult, String> {
-    crate::services::package_service::execute(request.target, request.action, request.package_name, request.index_url, request.requirements_path).await
+    crate::services::package_service::execute(request.target, request.action, request.package_name, request.package_version, request.index_url, request.requirements_path).await
 }
 
 #[tauri::command]
 pub fn start_package_action(request: PackageActionRequest) -> crate::services::task_service::TaskSnapshot {
     crate::services::task_service::cleanup();
     crate::services::task_service::start("package", "正在执行包管理操作", async move {
-        crate::services::package_service::execute(request.target, request.action, request.package_name, request.index_url, request.requirements_path).await
+        crate::services::package_service::execute(request.target, request.action, request.package_name, request.package_version, request.index_url, request.requirements_path).await
     })
 }

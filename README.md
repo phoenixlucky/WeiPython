@@ -4,6 +4,10 @@ WJ Python 管理大师是一款面向 Windows 的本地 Python 环境管理工�
 
 软件不需要账号，配置、日志和外观设置都保存在本机。
 
+当前版本：**3.1.3**
+
+Windows x64 便携版：[WJPythonManager-3.1.3-x64-portable.exe](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.1.3)
+
 ## 适合做什么
 
 - 查看本机 Python、Conda 环境和虚拟环境
@@ -24,8 +28,9 @@ WJ Python 管理大师是一款面向 Windows 的本地 Python 环境管理工�
 
 在项目的 `release/` 目录或发布页面下载对应文件：
 
+- 最新发布：[WeiPython 3.1.3](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.1.3)
 - `*-setup.exe`：安装版，适合日常使用
-- `*-portable.exe`：便携版，无需安装
+- `WJPythonManager-3.1.3-x64-portable.exe`：Windows x64 便携版，无需安装
 
 启动后，建议先打开左侧的“初始化配置”，根据向导完成 Conda 和首个 Python 环境的设置。
 
@@ -96,7 +101,8 @@ npm test
 1. 选择目标环境。
 2. 输入包名，或从已安装包列表中选择。
 3. 执行安装、升级、卸载、详情查询或最新版本查询。
-4. 需要批量安装时，选择 `requirements.txt` 文件。
+4. 安装包时可以选择安装最新版本、当前已安装版本，或手动输入指定版本。
+5. 需要批量安装时，选择 `requirements.txt` 文件。
 
 安装和升级前可以填写 pip 源地址。操作结果、命令输出和错误信息会显示在运行日志中。
 

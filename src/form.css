@@ -630,6 +630,22 @@
   min-width: 0;
 }
 
+.package-version-field {
+  display: grid;
+  gap: 7px;
+}
+
+.package-version-field > label {
+  color: #5f718a;
+  font-size: 12px;
+}
+
+.package-version-field .hint,
+.package-version-field .field-error {
+  margin: 0;
+  line-height: 1.5;
+}
+
 .advanced-actions {
   margin-top: 2px;
   padding-top: 12px;
@@ -1094,7 +1110,8 @@
 /* Package management: keep the selection grid and installed list visually distinct. */
 .packages-page .recommended-packages {
   margin-top: 3px;
-  padding-top: 15px;
+  gap: 6px;
+  padding-top: 11px;
   border-top: 1px solid #edf1f5;
 }
 
@@ -1103,8 +1120,14 @@
 }
 
 .packages-page .package-choice {
-  min-height: 64px;
+  min-height: 52px;
+  padding: 7px 8px;
+  gap: 6px !important;
   transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.packages-page .package-choice span {
+  gap: 1px;
 }
 
 .packages-page .package-choice:hover,
@@ -1125,7 +1148,11 @@
 }
 
 .packages-page .package-choice small {
-  line-height: 1.35;
+  line-height: 1.2;
+}
+
+.packages-page .recommended-packages > .wide {
+  margin-top: 1px;
 }
 
 .package-list {

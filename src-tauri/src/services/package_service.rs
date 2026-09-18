@@ -52,11 +52,18 @@ mod tests {
         assert_eq!(super::normalize_package_spec("numpy"), "numpy");
     }
 
+    #[test]
+    fn adds_exact_version_to_install_spec() {
+        assert_eq!(super::package_spec("numpy", Some("2.2.3")), "numpy==2.2.3");
+        assert_eq!(super::package_spec("wei-data-shu[excel]", Some("1.4.0")), "wei-data-shu[excel]==1.4.0");
+        assert_eq!(super::package_spec("numpy", None), "numpy");
+    }
+
     #[tokio::test]
     #[ignore = "requires local Python installation; read-only integration check"]
     async fn local_package_details_are_readable() {
         let target = crate::domain::models::EnvironmentTarget { target_type: "conda".into(), name: Some("base".into()), path: Some("D:\\ProgramData\\miniconda3".into()), ..Default::default() };
-        let result = super::execute(target, "show".into(), Some("pip".into()), Some("https://pypi.org/simple".into()), None).await;
+        let result = super::execute(target, "show".into(), Some("pip".into()), None, Some("https://pypi.org/simple".into()), None).await;
         assert!(result.is_ok(), "package details failed: {result:?}");
     }
 }
@@ -81,6 +88,15 @@ fn output(result: crate::services::process_service::ProcessOutput, message: &str
     OperationResult { ok: result.ok, message: message.into(), command: result.command, output: [result.stdout, result.stderr].into_iter().filter(|value| !value.is_empty()).collect::<Vec<_>>().join("\n") }
 }
 
+fn package_spec(package: &str, version: Option<&str>) -> String {
+    let package = normalize_package_spec(package);
+    version
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("{package}=={}", value.trim_start_matches("==")))
+        .unwrap_or(package)
+}
+
 pub async fn list(target: EnvironmentTarget) -> Result<Vec<Package>, String> {
     let result = run_pip(&target, vec!["list".into(), "--format=json".into()]).await?;
     if !result.ok { return Err(failure(&result, "读取已安装包失败")); }
@@ -99,7 +115,7 @@ async fn outdated_names(target: &EnvironmentTarget, index_url: Option<&str>) -> 
         .map_err(|error| format!("解析可升级包列表失败: {error}"))
 }
 
-pub async fn execute(target: EnvironmentTarget, action: String, package_name: Option<String>, index_url: Option<String>, requirements_path: Option<String>) -> Result<OperationResult, String> {
+pub async fn execute(target: EnvironmentTarget, action: String, package_name: Option<String>, package_version: Option<String>, index_url: Option<String>, requirements_path: Option<String>) -> Result<OperationResult, String> {
     if let Some(index) = index_url.as_deref().filter(|v| !v.is_empty()) {
         if !index.starts_with("https://") && !index.starts_with("http://") { return Err("下载源必须使用 http:// 或 https://".into()); }
     }
@@ -126,7 +142,7 @@ pub async fn execute(target: EnvironmentTarget, action: String, package_name: Op
     } else if action != "upgrade-pip" && action != "requirements" {
         let package = package_name.filter(|value| !value.trim().is_empty()).ok_or_else(|| "缺少包名".to_string())?;
         args.push(if matches!(action.as_str(), "install" | "upgrade") {
-            normalize_package_spec(&package)
+            package_spec(&package, package_version.as_deref())
         } else {
             package
         });

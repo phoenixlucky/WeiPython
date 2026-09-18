@@ -1,6 +1,6 @@
 {
   "name": "wj-python-manager-client",
-  "version": "3.1.2",
+  "version": "3.1.3",
   "private": true,
   "description": "WJ Python管理大师 Tauri desktop client",
   "author": "尉缭子科技",
