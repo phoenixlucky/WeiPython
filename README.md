@@ -1,131 +1,96 @@
 # WJ Python 管理大师
 
-WJ Python 管理大师是一款面向 Windows 的本地 Python 环境管理工具。它把 Python、Conda、venv、uv 和 pip 的常用操作集中到一个桌面应用中，帮助你更直观地创建环境、管理依赖和维护本机 Python 工具链。
+WJ Python 管理大师是一款面向 Windows 的本地 Python 环境管理工具。它把 Python、Conda、`venv`、`uv` 和 `pip` 的常用操作集中到一个桌面应用中，方便查看环境、管理依赖和维护本机 Python 工具链。
 
-软件不需要账号，配置、日志和外观设置都保存在本机。
+> **SSVIP 说明：** SSVIP 会员与付费提示仅供娱乐，是应用内的主题体验彩蛋，不代表真实商品、收费或服务，也不会触发支付。体验密钥：`greed is good`。
 
-当前版本：**3.1.3**
+## 界面预览
 
-Windows x64 便携版：[WJPythonManager-3.1.3-x64-portable.exe](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.1.3)
+### 环境概览
 
-## 适合做什么
+![环境概览](public/assets/screenshots/overview.webp)
 
-- 查看本机 Python、Conda 环境和虚拟环境
-- 初始化 Miniconda，并创建第一个 Python 环境
-- 创建、克隆、删除 Conda 环境
-- 导入或导出 Conda YAML 环境配置
-- 创建和扫描 Python `venv`、`uv` 虚拟环境
-- 安装、升级、卸载 Python 包
-- 从 `requirements.txt` 批量安装依赖
-- 管理 uv，导入或导出 uv 环境依赖
-- 查询可用 Python 版本，以及升级 Conda 环境中的 Python
-- 查看任务日志和运行中的进程
-- 自定义首页标语、背景和配色
+### Python 版本管理
+
+![Python 版本管理](public/assets/screenshots/python-versions.webp)
+
+### Python 包管理
+
+![Python 包管理](public/assets/screenshots/package-management.webp)
+
+### SSVIP 主题体验
+
+![SSVIP 主题体验](public/assets/screenshots/ssvip.webp)
+
+## 功能
+
+- **环境概览：** 查看 Python、Conda、虚拟环境和平台状态。
+- **初始化配置：** 检查 Conda，按向导配置 Miniconda 和首个 Python 环境。
+- **Conda 管理：** 创建、克隆、删除环境，导入或导出 YAML，并检查 Conda 更新。
+- **Python 版本：** 扫描本机 Python、查询可用版本，并升级受支持的系统或 Conda Python。
+- **虚拟环境：** 创建和扫描 `venv`、`uv` 环境，包括项目 `.venv`。
+- **包管理：** 安装、升级、卸载和查询包，也可从 `requirements.txt` 批量安装。
+- **uv 管理：** 检查、安装或卸载 uv，导入或导出环境依赖。
+- **本地设置：** 自定义首页标语、背景和配色，查看任务日志与运行进程。
 
 ## 安装与启动
 
-### 使用已打包版本
+### 下载发行版
 
-在项目的 `release/` 目录或发布页面下载对应文件：
+当前版本：**3.1.3**
 
-- 最新发布：[WeiPython 3.1.3](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.1.3)
-- `*-setup.exe`：安装版，适合日常使用
-- `WJPythonManager-3.1.3-x64-portable.exe`：Windows x64 便携版，无需安装
+- [查看 WeiPython 3.1.3 发布页](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.1.3)
+- `*-setup.exe`：安装版，适合日常使用。
+- `WJPythonManager-3.1.3-x64-portable.exe`：Windows x64 便携版，无需安装。
 
-启动后，建议先打开左侧的“初始化配置”，根据向导完成 Conda 和首个 Python 环境的设置。
+首次启动后，建议打开左侧的“初始化配置”，按向导检查 Conda 并设置 Python 环境。
 
 ### 从源码运行
 
-开发环境需要 Node.js 24 或更高版本，并需要 Rust 工具链。
+开发环境需要 Node.js 24 或更高版本，以及 Rust 工具链。
 
 ```bash
 npm install
 npm run tauri:dev
 ```
 
-运行测试：
+运行项目测试：
 
 ```bash
 npm test
 ```
 
-## 使用说明
+## 使用指南
 
-### 第一次使用
+### 初始化环境
 
-1. 打开“初始化配置”。
-2. 点击“重新检测”，查看本机是否已有 Conda。
-3. 如果没有 Conda，选择 Miniconda 安装目录和 Python 版本。
-4. 按需选择常用库，点击“开始初始化”。
-5. 初始化完成后，在“概览”查看环境状态。
+1. 打开“初始化配置”，点击“重新检测”。
+2. 如果尚未安装 Conda，选择 Miniconda 安装目录和 Python 版本。
+3. 按需选择常用库，然后点击“开始初始化”。
+4. 完成后回到“概览”查看环境状态。
 
-### 管理 Conda 环境
+### 管理环境和 Python
 
-进入“Conda 环境”：
+在“Conda”页面创建或克隆环境，查看路径、Python 版本和包数量，也可以导入或导出 YAML 配置。进入“虚拟环境”可创建或扫描 `venv` 和 `uv` 环境；在“Python 版本”页面扫描本机解释器，查询 Conda 可用版本，或升级受支持的 Python。
 
-- 按 Python 版本创建新环境，或克隆已有环境
-- 查看环境路径、Python 版本和已安装包数量
-- 删除不再使用的环境
-- 通过 YAML 文件导入或导出环境
-- 切换 `conda-forge` 或 `defaults` 软件源
-- 检查并升级 Conda
+不同来源安装的 Python 应使用对应的管理方式维护。系统 Python、Conda、`venv` 和 `uv` 环境各自独立。
 
-删除环境前请确认环境中没有需要保留的数据。`base` 环境不能直接删除。
+### 管理软件包
 
-### 管理 Python 版本
+1. 在“包管理”选择目标环境。
+2. 输入包名，或从已安装包列表选择。
+3. 执行安装、升级、卸载或版本查询；安装时可使用最新版本、当前版本或手动指定版本。
+4. 批量安装时选择 `requirements.txt` 文件。
 
-进入“Python 版本”：
+安装和升级前可以设置 pip 源。命令输出和操作结果会显示在运行日志中。
 
-- 重新扫描本机已安装的 Python
-- 在支持 `winget` 的 Windows 环境中升级系统 Python
-- 查询 Conda 软件源中的 Python 版本
-- 升级 Conda 环境中的 Python
+## 使用须知
 
-不同来源安装的 Python 要使用对应的管理方式维护。系统 Python、Conda、venv 和 uv 环境不会混为一谈。
-
-### 创建虚拟环境
-
-进入“虚拟环境”：
-
-1. 填写环境名称和目标目录。
-2. 选择 `Python venv` 或 `uv`。
-3. 可选填写 Python 路径或版本。
-4. 点击“创建虚拟环境”。
-
-也可以使用“扫描目录”识别已有的项目虚拟环境。uv 模式支持普通 uv 环境和 VS Code 常用的项目 `.venv` 模式。
-
-### 管理 Python 包
-
-进入“包管理”：
-
-1. 选择目标环境。
-2. 输入包名，或从已安装包列表中选择。
-3. 执行安装、升级、卸载、详情查询或最新版本查询。
-4. 安装包时可以选择安装最新版本、当前已安装版本，或手动输入指定版本。
-5. 需要批量安装时，选择 `requirements.txt` 文件。
-
-安装和升级前可以填写 pip 源地址。操作结果、命令输出和错误信息会显示在运行日志中。
-
-### 使用 uv
-
-进入“uv 管理”可以：
-
-- 检测本机已有的 uv
-- 安装最新版或指定版本
-- 选择安装目录
-- 卸载本程序识别的用户级 uv
-- 导出或导入 uv 环境的 `requirements.txt`
-
-卸载 uv 不会删除已经创建的虚拟环境。
-
-## 注意事项
-
-- 当前版本主要面向 Windows。
-- 创建环境、安装包和升级 Python 需要网络连接，并受本机权限影响。
-- 软件会调用本机的 Python、Conda、pip、uv 和 Windows 工具，不会替你远程管理环境。
-- 删除环境和卸载包属于实际修改操作，请确认目标后再执行。
-- pip 源、Conda 软件源和 Python 下载地址由用户选择，网络问题通常需要检查源地址或代理设置。
-- 所有设置和运行日志默认保存在本机，不上传到服务器。
+- 软件主要面向 Windows，并调用本机的 Python、Conda、pip、uv 和 Windows 工具管理环境。
+- 创建环境、安装软件包和升级 Python 可能需要网络，并受本机权限及软件源状态影响。
+- 删除环境或卸载软件包会修改本机环境；执行前请确认目标。`base` 环境不能直接删除。
+- 设置和运行日志默认保存在本机，不上传到服务器。
+- SSVIP 激活密钥是源码中用于本地演示的固定字符串，不是安全凭证或真实付费授权。密钥：`greed is good`。
 
 ## 开源协议
 
