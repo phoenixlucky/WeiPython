@@ -49,6 +49,8 @@ WJ Python 管理大师是一款面向 Windows 的本地 Python 环境管理工�
 
 开发环境需要 Node.js 24 或更高版本，以及 Rust 工具链。
 
+依赖版本参考 [技术栈图谱](https://phoenixlucky.github.io/tech-stack-tree/index.html)：Tauri 2.12.7、Vue 3.5.46、Pinia 4.1.0、Vue Router 5.5.1、TypeScript 7.0.2、Vite 8.3.8。Vue 使用图谱所列 3.5.45 的后续补丁版本；具体安装版本由 `package-lock.json` 和 `src-tauri/Cargo.lock` 固定。
+
 ```bash
 npm install
 npm run tauri:dev
@@ -74,6 +76,8 @@ npm test
 在“Conda”页面创建或克隆环境，查看路径、Python 版本和包数量，也可以导入或导出 YAML 配置。进入“虚拟环境”可创建或扫描 `venv` 和 `uv` 环境；在“Python 版本”页面扫描本机解释器，查询 Conda 可用版本，或升级受支持的 Python。
 
 系统 Python、Conda、`venv` 和 `uv` 环境彼此独立。请使用各自对应的管理方式维护。
+
+支持 Python 3.15 系列（包括 3.15.2）的系统解释器识别和版本选择。Conda 创建及升级默认查询 3.15 系列；`uv` 可指定 `3.15.2` 创建环境。具体可安装版本取决于所选 Conda 软件源或 uv 的支持情况。
 
 ### 管理软件包
 

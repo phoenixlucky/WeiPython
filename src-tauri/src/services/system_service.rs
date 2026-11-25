@@ -38,12 +38,18 @@ pub async fn discover_python_versions() -> Vec<String> {
         if let Some(home) = std::env::var_os("USERPROFILE") {
             let home = PathBuf::from(home);
             candidates.push(home.join("AppData").join("Local").join("Programs").join("Python"));
+            candidates.push(home.join("AppData").join("Local").join("Python"));
+        }
+        if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+            candidates.push(PathBuf::from(local_app_data).join("Python"));
         }
         for root in [
-            "C:\\Python39", "C:\\Python310", "C:\\Python311", "C:\\Python312", "C:\\Python313", "C:\\Python314",
-            "D:\\Python39", "D:\\Python310", "D:\\Python311", "D:\\Python312", "D:\\Python313", "D:\\Python314",
+            "C:\\Python39", "C:\\Python310", "C:\\Python311", "C:\\Python312", "C:\\Python313", "C:\\Python314", "C:\\Python315",
+            "D:\\Python39", "D:\\Python310", "D:\\Python311", "D:\\Python312", "D:\\Python313", "D:\\Python314", "D:\\Python315",
             "C:\\Program Files\\Python", "C:\\Program Files (x86)\\Python",
             "D:\\Program Files\\Python", "D:\\Program Files (x86)\\Python",
+            "C:\\Program Files\\Python315", "C:\\Program Files (x86)\\Python315",
+            "D:\\Program Files\\Python315", "D:\\Program Files (x86)\\Python315",
         ] {
             candidates.push(PathBuf::from(root));
         }
@@ -88,8 +94,16 @@ pub async fn discover_python_versions() -> Vec<String> {
             versions.push(format!("{version} ({})", executable.to_string_lossy()));
         }
     }
-    versions.sort_by(|left, right| right.cmp(left));
+    sort_python_versions(&mut versions);
     versions
+}
+
+fn sort_python_versions(versions: &mut [String]) {
+    let version_key = |entry: &str| {
+        entry.split_whitespace().next().unwrap_or("").split('.')
+            .map(|part| part.parse::<u32>().unwrap_or(0)).collect::<Vec<_>>()
+    };
+    versions.sort_by(|left, right| version_key(right).cmp(&version_key(left)).then_with(|| right.cmp(left)));
 }
 
 pub async fn uninstall_python(path: String) -> Result<OperationResult, String> {
@@ -285,6 +299,25 @@ fn parse_python_major_minor(version: &str) -> Option<(u32, u32)> {
 mod tests {
     use super::{parse_python_launcher_paths, parse_python_major_minor};
 
+    #[test]
+    fn sorts_python_versions_numerically_with_latest_first() {
+        let mut versions = vec![
+            "3.9.25 (C:\\Python39\\python.exe)".into(),
+            "3.15.2 (C:\\Python315\\python.exe)".into(),
+            "3.14.10 (C:\\Python314\\python.exe)".into(),
+            "3.15.10 (D:\\Python315\\python.exe)".into(),
+            "3.15.1 (C:\\Program Files\\Python315\\python.exe)".into(),
+        ];
+        super::sort_python_versions(&mut versions);
+        assert_eq!(versions, vec![
+            "3.15.10 (D:\\Python315\\python.exe)",
+            "3.15.2 (C:\\Python315\\python.exe)",
+            "3.15.1 (C:\\Program Files\\Python315\\python.exe)",
+            "3.14.10 (C:\\Python314\\python.exe)",
+            "3.9.25 (C:\\Python39\\python.exe)",
+        ]);
+    }
+
     #[tokio::test]
     #[ignore = "requires local Conda installation; read-only integration check"]
     async fn local_environment_inventory() {
@@ -308,7 +341,17 @@ mod tests {
     }
 
     #[test]
+    fn parses_python_315_install_manager_paths() {
+        let paths = parse_python_launcher_paths("-V:3.15 * C:\\Users\\Test User\\AppData\\Local\\Python\\pythoncore-3.15-64\\python.exe\n-V:3.15t C:\\Python315t\\python.exe");
+        assert_eq!(paths, vec![
+            std::path::PathBuf::from("C:\\Users\\Test User\\AppData\\Local\\Python\\pythoncore-3.15-64\\python.exe"),
+            std::path::PathBuf::from("C:\\Python315t\\python.exe"),
+        ]);
+    }
+
+    #[test]
     fn parses_python_major_minor_for_winget_package() {
+        assert_eq!(parse_python_major_minor("3.15.2"), Some((3, 15)));
         assert_eq!(parse_python_major_minor("3.13.7"), Some((3, 13)));
         assert_eq!(parse_python_major_minor("Python 3.13"), None);
     }

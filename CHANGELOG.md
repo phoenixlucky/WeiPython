@@ -1,4 +1,16 @@
 # 更新日志
+## 未发布 - 技术栈依赖升级 (2026-11-25)
+
+- 参考技术栈图谱，升级 Tauri 2.12.7、Vue 3.5.46、Pinia 4.1.0、Vue Router 5.5.1、TypeScript 7.0.2 和 Vite 8.3.8。
+- 同步升级 Tauri CLI/API、文件对话框插件、Vue 构建插件、Node.js 24 类型，以及 Rust 构建依赖、serde_json、Tokio 和 thiserror；更新 npm 与 Cargo 锁文件。
+- 适配 TypeScript 7，移除已删除的 `baseUrl` 配置，路径别名改用相对路径。
+
+## 未发布 - Python 3.15.2 兼容 (2026-11-25)
+
+- Python 版本页新增 3.15 系列，Conda 创建环境和升级查询默认使用 3.15。
+- 补充 Windows Python315 常见安装路径扫描，系统解释器按数字版本降序排列。
+- 更新虚拟环境命名示例及 uv 的 Python 3.15.2 使用说明。
+
 ## v2.8.7 - 外观设置修复与性能优化 (2026-08-06)
 
 ### 🐛 Bug 修复

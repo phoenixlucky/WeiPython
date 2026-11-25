@@ -12,7 +12,7 @@ export const useWorkspaceStore = defineStore("workspace", () => {
   const condaPythonVersions = ref<string[]>([]);
   const condaPythonSearchStatus = ref("");
   const condaPythonSearchKey = ref("");
-  const condaPythonForm = reactive({ major: "3.14", channel: "conda-forge", environment: "", version: "" });
+  const condaPythonForm = reactive({ major: "3.15", channel: "conda-forge", environment: "", version: "" });
   const pending = ref(0);
   const busy = computed(() => pending.value > 0);
   const message = ref("");

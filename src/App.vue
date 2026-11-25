@@ -73,7 +73,7 @@ onMounted(async () => {
     app.overview = { runtime: { python: "3.14.7", conda: "26.7.2", platform: "Windows" }, environments: previewEnvironments, checkedAt: new Date().toISOString() };
     workspace.conda = previewEnvironments;
     workspace.venvs = previewVenvs;
-    workspace.pythonVersions = ["3.14.7", "3.14.6", "3.13.5", "3.12.10"];
+    workspace.pythonVersions = ["3.15.2 (C:\\Python315\\python.exe)", "3.14.7", "3.14.6", "3.13.5", "3.12.10"];
   }
 });
 

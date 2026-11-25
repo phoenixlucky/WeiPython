@@ -20,7 +20,7 @@ const pythonEntries = computed(() => workspace.pythonVersions.map((entry) => {
   return marker > 0 && entry.endsWith(")") ? { version: entry.slice(0, marker), path: entry.slice(marker + 2, -1) } : { version: entry, path: entry };
 }));
 const selectedEntry = computed(() => pythonEntries.value.find((entry) => entry.path === selectedPath.value));
-const majorVersions = ["3.14", "3.13", "3.12", "3.11", "3.10", "3.9"];
+const majorVersions = ["3.15", "3.14", "3.13", "3.12", "3.11", "3.10", "3.9"];
 
 watch(pythonEntries, (entries) => {
   if (!entries.some((entry) => entry.path === selectedPath.value)) selectedPath.value = entries[0]?.path || "";
@@ -111,7 +111,7 @@ onMounted(() => {
       <article class="card form-card">
         <h2>Conda Python 升级</h2>
         <label>目标环境<select v-model="form.environment"><option value="">选择环境</option><option v-for="item in workspace.conda" :key="item.name" :value="item.name">{{ item.name }}</option></select></label>
-        <label>大版本<select v-model="form.major"><option v-for="version in majorVersions" :key="version" :value="version">Python {{ version }}{{ version === "3.14" ? "（推荐）" : "" }}</option></select></label>
+        <label>大版本<select v-model="form.major"><option v-for="version in majorVersions" :key="version" :value="version">Python {{ version }}{{ version === "3.15" ? "（最新稳定系列）" : "" }}</option></select></label>
         <label>软件源<select v-model="form.channel"><option value="conda-forge">conda-forge</option><option value="defaults">defaults</option></select></label>
         <div class="button-grid"><button type="button" class="secondary" :disabled="workspace.busy || searching" @click="search(false)">{{ searching ? "查询中…" : "查询可用版本" }}</button><button type="button" class="secondary" :disabled="workspace.busy || searching" @click="search(true)">强制刷新</button></div>
         <p v-if="searchStatus" class="hint query-status" role="status" aria-live="polite">{{ searchStatus }}</p>

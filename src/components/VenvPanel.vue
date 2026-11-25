@@ -28,7 +28,7 @@ function uniqueName() {
   const tool = form.manager === "uv" ? "uv" : "venv";
   const rawVersion = form.pythonPath.trim().match(/(?:^|[^\d])(\d+\.\d+(?:\.\d+)?)(?:$|[^\d])/);
   const detectedVersion = workspace.pythonVersions[0]?.match(/^(\d+\.\d+(?:\.\d+)?)/)?.[1];
-  const version = rawVersion?.[1] || detectedVersion || "3.14";
+  const version = rawVersion?.[1] || detectedVersion || "3.15";
   const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
   const randomValues = new Uint32Array(3);
   if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(randomValues);
@@ -128,7 +128,7 @@ onMounted(async () => {
     <div class="workspace-columns">
       <article class="card form-card">
         <h2>创建环境</h2>
-        <label>环境名称<div class="input-action"><input v-model="form.name" placeholder="wj_uv_py3.14_a7k" :disabled="workspace.busy" /><button class="secondary" type="button" :disabled="workspace.busy" @click="generateDefaultName">生成默认名称</button></div></label>
+        <label>环境名称<div class="input-action"><input v-model="form.name" placeholder="wj_uv_py3.15_a7k" :disabled="workspace.busy" /><button class="secondary" type="button" :disabled="workspace.busy" @click="generateDefaultName">生成默认名称</button></div></label>
         <label>目标目录<div class="input-action"><input v-model="form.targetPath" placeholder="C:\\Users\\你的用户名\\venvs" /><button class="secondary" type="button" :disabled="workspace.busy" @click="chooseTargetDirectory">选择</button></div><small class="hint">推荐目录：{{ defaultDirectory || "读取中…" }}</small></label>
         <p v-if="finalPath" class="hint">将创建到：{{ finalPath }}</p>
         <label>创建工具<select v-model="form.manager" @change="generateDefaultName"><option value="venv">Python venv</option><option value="uv">uv</option></select></label>
@@ -136,7 +136,7 @@ onMounted(async () => {
         <div v-if="form.manager === 'uv'" class="uv-tools"><p class="hint">{{ uvPath ? '已检测到 uv：' + uvPath : '当前未检测到 uv，请前往“uv 管理”安装。' }}</p></div>
         <label>{{ form.manager === 'uv' ? 'Python 版本或路径（可选）' : 'Python 路径（可选）' }}<input v-model="form.pythonPath" list="python-options" :placeholder="form.manager === 'uv' ? '留空由 uv 自动选择并下载' : '留空时自动检测系统 Python'" /></label>
         <datalist id="python-options"><option v-for="item in pythonOptions" :key="item.path" :value="item.path">{{ item.version }}</option></datalist>
-        <p class="hint">{{ form.manager === 'uv' ? (form.installMode === 'vscode' ? '请将目标目录选择为 VS Code 项目根目录；名称建议使用 .venv，也可以自定义。' : 'uv 模式无需系统 Python；可填写 3.13、3.13.5 或解释器路径，找不到时 uv 会自动下载。') : '留空时由程序自动选择系统 Python。' }}</p>
+        <p class="hint">{{ form.manager === 'uv' ? (form.installMode === 'vscode' ? '请将目标目录选择为 VS Code 项目根目录；名称建议使用 .venv，也可以自定义。' : 'uv 模式无需系统 Python；可填写 3.15、3.15.2 或解释器路径，找不到时 uv 会自动下载；可安装版本以 uv 支持为准。') : '留空时由程序自动选择系统 Python。' }}</p>
         <button class="primary wide" :disabled="workspace.busy || !form.name || !form.targetPath || (form.manager === 'uv' && !uvPath)" @click="create">创建虚拟环境</button>
       </article>
       <article class="card">
