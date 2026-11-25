@@ -233,6 +233,34 @@ mod tests {
         assert!(is_conda_tos_error(&output));
     }
 
+    #[test]
+    fn stable_search_excludes_numeric_releases_that_require_python_rc() {
+        let parsed = serde_json::json!({"python": [
+            {"version": "3.15.0rc1", "depends": ["_python_rc"]},
+            {"version": "3.15.0", "depends": ["_python_rc >=1"]},
+            {"version": "3.14.2", "depends": ["openssl >=3"]},
+            {"version": "3.14.10", "depends": []},
+            {"version": "3.14.2", "depends": []}
+        ]});
+        assert_eq!(super::stable_python_versions(&parsed), vec!["3.14.10", "3.14.2"]);
+    }
+
+    #[test]
+    fn upgrade_conflict_explains_both_rc_and_base_abi_constraints() {
+        let output = ProcessOutput { ok: false, stdout: String::new(), stderr: "LibMambaUnsatisfiableError: nothing provides _python_rc; conda-anaconda-tos requires python_abi =3.14 *_cp314".into(), command: "conda install".into() };
+        let message = super::python_upgrade_failure(&output);
+        assert!(message.contains("候选版"));
+        assert!(message.contains("defaults"));
+        assert!(message.contains("新建"));
+        assert!(message.contains(&output.stderr));
+    }
+
+    #[test]
+    fn upgrade_pins_patch_version_without_matching_rc_builds() {
+        assert_eq!(super::python_upgrade_spec("3.15.0"), "python==3.15.0");
+        assert_eq!(super::python_upgrade_spec("3.14"), "python=3.14");
+    }
+
     #[tokio::test]
     #[ignore = "requires network and local Conda installation; read-only integration check"]
     async fn local_python_version_search_returns_or_reports_error() {
@@ -397,10 +425,19 @@ async fn search_python_uncached(version: String, channel: String) -> Result<Vec<
     let result = run_conda(&args).await?;
     if !result.ok { return Err(failure(&result, "查询 Python 版本失败")); }
     let parsed = parse_json_value(&result.stdout, &result.stderr)?;
-    let mut versions: Vec<String> = parsed.get("python").and_then(|value| value.as_array()).into_iter().flatten().filter_map(|value| value.get("version").and_then(|item| item.as_str()).map(str::to_owned)).filter(|value| value.chars().all(|character| character.is_ascii_digit() || character == '.')).collect();
+    Ok(stable_python_versions(&parsed))
+}
+
+fn stable_python_versions(parsed: &serde_json::Value) -> Vec<String> {
+    let mut versions: Vec<String> = parsed.get("python").and_then(|value| value.as_array()).into_iter().flatten()
+        .filter(|record| !record.get("depends").and_then(|value| value.as_array()).into_iter().flatten()
+            .filter_map(|value| value.as_str()).any(|dependency| spec_name(dependency) == "_python_rc"))
+        .filter_map(|record| record.get("version").and_then(|value| value.as_str()))
+        .filter(|version| version.split('.').count() == 3 && version.split('.').all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit())))
+        .map(str::to_owned).collect();
     versions.sort_by(|left, right| right.split('.').map(|part| part.parse::<u32>().unwrap_or(0)).cmp(left.split('.').map(|part| part.parse::<u32>().unwrap_or(0))));
     versions.dedup();
-    Ok(versions)
+    versions
 }
 
 fn parse_json_value(stdout: &str, stderr: &str) -> Result<serde_json::Value, String> {
@@ -448,12 +485,25 @@ fn python_upgrade_failure(result: &crate::services::process_service::ProcessOutp
     } else if detail.contains("WinError 5") {
         "升级 base Python 时没有权限替换 Conda 文件，请关闭其他 Conda/终端进程后以管理员权限重试。".into()
     } else {
-        detail
+        let mut hints = Vec::new();
+        if detail.contains("_python_rc") {
+            hints.push("依赖求解尝试了需要 _python_rc 的候选版构建。请强制刷新并选择正式版本，不要为升级 base 添加候选版测试源。");
+        }
+        if detail.contains("Unsatisfiable") || detail.contains("unsatisfiable") {
+            if detail.contains("conda-anaconda-tos") || detail.contains("conda-anaconda-telemetry") {
+                hints.push("当前环境的 Anaconda 组件与目标 Python 存在依赖冲突。对于来自 defaults 的 base，请使用 defaults 并选择兼容版本；需要新版 Python 时，建议在 conda-forge 新建独立环境。");
+            } else {
+                hints.push("目标 Python 与当前环境的包或版本约束不兼容，请选择兼容版本，或新建独立环境。");
+            }
+        }
+        hints.push(&detail);
+        hints.join("\n\n")
     }
 }
 
 async fn search_python_cached(version: String, channel: String, force_refresh: bool) -> Result<Vec<String>, String> {
-    let key = format!("{}::{}", channel.trim(), version.trim());
+    // Old cache entries did not check the _python_rc dependency.
+    let key = format!("stable-v2::{}::{}", channel.trim(), version.trim());
     if !force_refresh {
         if let Some(path) = cache_path() {
             if let Ok(content) = tokio::fs::read_to_string(&path).await {
@@ -479,16 +529,20 @@ async fn search_python_cached(version: String, channel: String, force_refresh: b
     Ok(versions)
 }
 
+fn python_upgrade_spec(version: &str) -> String {
+    if version.split('.').count() == 3 { format!("python=={version}") } else { format!("python={version}") }
+}
+
 pub async fn upgrade_python(name: String, version: String, channel: String) -> Result<OperationResult, String> {
     if name.trim().is_empty() || version.trim().is_empty() { return Err("环境名称和目标 Python 版本不能为空".into()); }
     let existing = list().await?.into_iter().find(|e| e.name == name).ok_or("未找到目标环境")?;
-    let mut args = vec!["install".into(), "-n".into(), name.clone(), format!("python={version}")];
+    let mut args = vec!["install".into(), "-n".into(), name.clone(), python_upgrade_spec(&version)];
     if channel != "defaults" && !channel.is_empty() { args.extend(["-c".into(), channel, "--override-channels".into()]); }
     args.push("-y".into());
     let mut dry_run = args.clone();
     dry_run.push("--dry-run".into());
     let check = run_conda(&dry_run).await?;
-    if !check.ok { return Err(failure(&check, "升级依赖检查失败")); }
+    if !check.ok { return Err(python_upgrade_failure(&check)); }
     tokio::fs::create_dir_all(export_directory()).await.map_err(|e| e.to_string())?;
     let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis();
     let backup = export_directory().join(format!("{}-before-upgrade-{timestamp}.yml", safe_file_name(&name)));

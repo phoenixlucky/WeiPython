@@ -3,7 +3,7 @@
   <h1>WJ Python 管理大师</h1>
   <p>在一个桌面应用中管理 Python、Conda、虚拟环境和软件包</p>
   <p>
-    <a href="https://github.com/phoenixlucky/WeiPython/releases/tag/v3.1.3"><img src="https://img.shields.io/badge/版本-3.1.3-2563EB" alt="版本 3.1.3"></a>
+    <a href="https://github.com/phoenixlucky/WeiPython/releases/tag/v3.2.0"><img src="https://img.shields.io/badge/版本-3.2.0-2563EB" alt="版本 3.2.0"></a>
     <img src="https://img.shields.io/badge/平台-Windows-0A66C2" alt="平台 Windows">
     <a href="LICENSE"><img src="https://img.shields.io/badge/许可证-GPL--3.0-4B5563" alt="GPL-3.0 许可证"></a>
   </p>
@@ -38,10 +38,10 @@ WJ Python 管理大师是一款面向 Windows 的本地 Python 环境管理工�
 
 ## 下载与启动
 
-当前版本：**3.1.3** · [前往 GitHub Releases 下载](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.1.3)
+当前版本：**3.2.0** · [前往 GitHub Releases 下载](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.2.0)
 
 - `*-setup.exe`：安装版，适合日常使用。
-- `WJPythonManager-3.1.3-x64-portable.exe`：Windows x64 便携版，无需安装。
+- `WJPythonManager-3.2.0-x64-portable.exe`：Windows x64 便携版，无需安装。
 
 首次启动后，打开左侧的“初始化配置”，按向导检查 Conda 并设置 Python 环境。
 

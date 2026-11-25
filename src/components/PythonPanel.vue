@@ -28,7 +28,7 @@ watch(pythonEntries, (entries) => {
 
 watch(() => [form.major, form.channel], ([major, channel]) => {
   const key = `${channel}::${major}`;
-  if (workspace.condaPythonSearchKey && workspace.condaPythonSearchKey !== key) {
+  if (workspace.condaPythonSearchKey !== key) {
     workspace.condaPythonVersions = [];
     workspace.condaPythonSearchStatus = "";
     form.version = "";
@@ -41,17 +41,20 @@ async function search(force = false) {
   error.value = "";
   searchStatus.value = force ? "正在强制刷新 Conda 软件源，首次查询可能需要一些时间…" : "正在查询 Conda 软件源…";
   workspace.condaPythonVersions = [];
+  form.version = "";
   try {
     const versions = await invokeCommand<string[]>(force ? "refresh_conda_python_versions" : "search_conda_python_versions", { version: query.major, channel: query.channel });
+    if (form.major !== query.major || form.channel !== query.channel) return;
     workspace.condaPythonVersions = versions;
     workspace.condaPythonSearchKey = `${query.channel}::${query.major}`;
     if (!versions.length) {
-      error.value = "没有找到可用版本，请检查大版本号或软件源。";
-      searchStatus.value = "查询完成，但没有找到可用版本。";
+      error.value = "当前软件源没有找到正式版本，请切换大版本或软件源。";
+      searchStatus.value = "查询完成，已排除候选版和依赖 _python_rc 的构建。";
     } else {
-      searchStatus.value = `查询完成，找到 ${versions.length} 个可用版本。`;
+      searchStatus.value = `查询完成，找到 ${versions.length} 个正式版本；是否兼容目标环境将在升级前检查。`;
     }
   } catch (cause) {
+    if (form.major !== query.major || form.channel !== query.channel) return;
     error.value = describeError(cause, "查询 Conda Python 版本失败");
     searchStatus.value = "查询失败，请查看上方错误提示。";
   } finally {
@@ -60,7 +63,7 @@ async function search(force = false) {
 }
 
 async function upgrade() {
-  if (form.environment && form.version) await workspace.startPythonUpgrade(form.environment, form.version, form.channel);
+  if (!searching.value && form.environment && available.value.includes(form.version)) await workspace.startPythonUpgrade(form.environment, form.version, form.channel);
 }
 
 async function uninstallSelected() {
@@ -111,12 +114,13 @@ onMounted(() => {
       <article class="card form-card">
         <h2>Conda Python 升级</h2>
         <label>目标环境<select v-model="form.environment"><option value="">选择环境</option><option v-for="item in workspace.conda" :key="item.name" :value="item.name">{{ item.name }}</option></select></label>
-        <label>大版本<select v-model="form.major"><option v-for="version in majorVersions" :key="version" :value="version">Python {{ version }}{{ version === "3.15" ? "（最新稳定系列）" : "" }}</option></select></label>
+        <label>大版本<select v-model="form.major"><option v-for="version in majorVersions" :key="version" :value="version">Python {{ version }}</option></select></label>
         <label>软件源<select v-model="form.channel"><option value="conda-forge">conda-forge</option><option value="defaults">defaults</option></select></label>
+        <p v-if="form.environment === 'base'" id="base-upgrade-hint" class="hint">升级 base 请沿用其原软件源；Anaconda/Miniconda 通常为 defaults。需要其他源的新版 Python 时，建议新建独立环境。</p>
         <div class="button-grid"><button type="button" class="secondary" :disabled="workspace.busy || searching" @click="search(false)">{{ searching ? "查询中…" : "查询可用版本" }}</button><button type="button" class="secondary" :disabled="workspace.busy || searching" @click="search(true)">强制刷新</button></div>
         <p v-if="searchStatus" class="hint query-status" role="status" aria-live="polite">{{ searchStatus }}</p>
-        <select v-model="form.version"><option value="">选择目标版本</option><option v-for="version in available" :key="version" :value="version">{{ version }}</option></select>
-        <button class="primary" :disabled="workspace.busy || !form.environment || !form.version" @click="upgrade">执行升级</button>
+        <label>目标版本<select v-model="form.version" :aria-describedby="form.environment === 'base' ? 'base-upgrade-hint' : undefined"><option value="">选择目标版本</option><option v-for="version in available" :key="version" :value="version">{{ version }}</option></select></label>
+        <button class="primary" :disabled="workspace.busy || searching || !form.environment || !available.includes(form.version)" @click="upgrade">执行升级</button>
       </article>
     </div>
   </section>
