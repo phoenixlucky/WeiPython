@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { describeError, invokeCommand } from "@/lib/tauri";
 import { chooseDirectory } from "@/lib/dialog";
 import { useAppStore } from "@/stores/app";
 import { useWorkspaceStore } from "@/stores/workspace";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import TaskProgress from "@/components/TaskProgress.vue";
 
 const app = useAppStore();
 const workspace = useWorkspaceStore();
@@ -12,10 +13,12 @@ const status = ref<SetupStatus | null>(null);
 const form = reactive({ installPath: "" });
 const showCondaTosConfirm = ref(false);
 const steps = [
-  { label: "检测电脑上的 Conda", progress: 10 },
-  { label: "下载并安装最新版 Miniconda", progress: 30 },
-  { label: "完成 Miniconda 初始化", progress: 90 },
+  { label: "检测电脑上的 Conda", stage: "检测现有 Conda" },
+  { label: "下载并安装最新版 Miniconda", stage: "下载并安装 Miniconda" },
+  { label: "完成 Miniconda 初始化", stage: "验证安装并保存 Conda 路径" },
 ];
+const setupTask = computed(() => workspace.currentTask?.taskType === "miniconda-install" ? workspace.currentTask : null);
+const activeStep = computed(() => steps.findIndex((step) => step.stage === setupTask.value?.message));
 
 interface SetupStatus {
   recommendedInstallPath: string;
@@ -26,11 +29,11 @@ interface SetupStatus {
   environmentCount: number;
 }
 
-async function refresh() {
+async function refresh(force = false) {
   try {
+    await app.refresh(force);
     status.value = await invokeCommand<SetupStatus>("get_setup_status");
     if (!form.installPath) form.installPath = status.value.recommendedInstallPath;
-    await Promise.all([app.refresh().catch(() => undefined), workspace.refreshAll().catch(() => undefined)]);
   } catch (cause) {
     workspace.error = describeError(cause, "检测初始化状态失败");
   }
@@ -67,7 +70,7 @@ onMounted(refresh);
 
 <template>
   <section class="content subpage-content setup-page">
-    <div class="page-heading"><div><span class="eyebrow">// First-run Setup</span><h1>新电脑初始化配置</h1><p>检测现有 Conda；缺失时安装最新版 Miniconda，不创建 Conda 环境。</p></div><button class="secondary" :disabled="workspace.busy" @click="refresh">重新检测</button></div>
+    <div class="page-heading"><div><span class="eyebrow">// First-run Setup</span><h1>新电脑初始化配置</h1><p>检测现有 Conda；缺失时安装最新版 Miniconda，不创建 Conda 环境。</p></div><button class="secondary" :disabled="workspace.busy" @click="refresh(true)">重新检测</button></div>
     <div class="setup-layout">
       <article class="card form-card accent-card">
         <div class="card-badge-row"><span class="card-badge">One-click Setup</span><span class="card-badge subtle">Windows x64</span></div>
@@ -78,7 +81,7 @@ onMounted(refresh);
       </article>
       <div class="aside-stack">
         <article class="card setup-card"><div class="card-heading"><div><span class="eyebrow">System Maintenance</span><h2>Miniconda 维护</h2></div><span>{{ status?.condaAvailable ? '已连接' : '未检测到' }}</span></div><div class="maintenance-kv"><span>Conda 版本</span><strong>{{ status?.condaVersion || '-' }}</strong><span>base Python</span><strong>{{ status?.basePythonVersion || '-' }}</strong><span>安装目录</span><strong>{{ status?.rootPrefix || '-' }}</strong><span>已登记环境</span><strong>{{ status?.environmentCount ?? 0 }}</strong></div><p class="maintenance-note">{{ status?.condaAvailable ? '只更新 base 中的 Conda 核心包，不修改已有业务环境；升级前会自动备份 base 配置。' : '请先完成 Miniconda 初始化安装。' }}</p><button class="secondary wide" :disabled="workspace.busy || !status?.condaAvailable" @click="upgradeConda">检查并无损升级</button></article>
-        <article class="card setup-card"><div class="card-heading"><div><h2>执行步骤</h2></div><span>{{ workspace.currentTask?.progress || 0 }}%</span></div><div class="setup-progress"><span :style="{ width: (workspace.currentTask?.progress || 0) + '%' }"></span></div><ol class="setup-steps"><li v-for="step in steps" :key="step.label" :class="{ active: workspace.currentTask?.status === 'running' && (workspace.currentTask?.progress || 0) <= step.progress, complete: workspace.currentTask?.status === 'completed' || (workspace.currentTask?.status === 'running' && (workspace.currentTask?.progress || 0) > step.progress) }">{{ step.label }}</li></ol></article>
+        <article class="card setup-card"><div class="card-heading"><div><h2>执行步骤</h2></div><span>{{ setupTask?.message || "等待开始" }}</span></div><TaskProgress v-if="setupTask" :value="setupTask.progress" :label="setupTask.message" /><ol class="setup-steps"><li v-for="step in steps" :key="step.label" :class="{ active: setupTask?.status === 'running' && setupTask.message === step.stage, complete: setupTask?.status === 'completed' || (setupTask?.status === 'running' && activeStep > steps.indexOf(step)) }">{{ step.label }}</li></ol></article>
       </div>
     </div>
   </section>

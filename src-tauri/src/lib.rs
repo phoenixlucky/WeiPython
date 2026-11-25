@@ -50,7 +50,15 @@ pub fn run() {
             commands::delete_virtual_environment,
             commands::list_packages,
             commands::package_action,
-            commands::start_package_action
+            commands::start_package_action,
+            commands::start_create_conda_environment,
+            commands::start_delete_conda_environment,
+            commands::start_export_conda_environment,
+            commands::start_export_all_conda_environments,
+            commands::start_import_conda_environment,
+            commands::start_create_virtual_environment,
+            commands::save_wallpaper,
+            commands::read_wallpaper
         ])
         .run(tauri::generate_context!())
         .expect("error while running WJ Python管理大师");

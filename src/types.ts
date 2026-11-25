@@ -19,7 +19,8 @@ export interface Overview {
 }
 
 export interface AppSettings {
-  condaPath?: string;
+  condaPath?: string | null;
+  uvPath?: string | null;
   tagline: string;
   compactMode: boolean;
   wallpaper?: string;
@@ -71,7 +72,7 @@ export interface TaskSnapshot {
   taskType: string;
   status: "running" | "completed" | "failed" | "cancelled";
   message: string;
-  progress: number;
+  progress: number | null;
   output: string;
   command: string;
   startedAt: number;

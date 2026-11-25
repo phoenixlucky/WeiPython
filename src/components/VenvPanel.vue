@@ -70,13 +70,13 @@ async function chooseScanDirectory() {
 }
 
 async function create() {
-  await workspace.createVenv({
+  const task = await workspace.createVenv({
     name: form.name,
     targetPath: form.targetPath,
     pythonPath: form.pythonPath,
     manager: form.manager,
   });
-  if (!workspace.error) regenerateDefaults();
+  if (task?.status === "completed") regenerateDefaults();
 }
 function confirmDelete(path: string, name: string) {
   confirmRequest.value = { title: `删除虚拟环境“${name}”？`, message: "环境中的包和数据将被移除，此操作无法撤销。", confirmLabel: "确认删除", action: async () => { await workspace.deleteVenv(path); } };
@@ -88,7 +88,7 @@ async function refreshUv() {
 
 async function scan() {
   showScanPanel.value = true;
-  await workspace.loadVenvs(scanDirectory.value);
+  await workspace.loadVenvs(scanDirectory.value, true);
 }
 
 async function copyPath(path: string) {
@@ -123,7 +123,7 @@ onMounted(async () => {
   <section class="content subpage-content venv-page">
     <div class="page-heading">
       <div><span class="eyebrow">// Virtual Environments</span><h1>虚拟环境</h1><p>使用 Python 标准库或 uv 创建和维护虚拟环境。</p></div>
-      <div class="button-grid"><button class="secondary" :disabled="workspace.busy" @click="Promise.all([workspace.loadVenvs(), workspace.loadPythonVersions()])">刷新</button><button class="secondary" :disabled="workspace.busy" @click="showScanPanel = !showScanPanel">{{ showScanPanel ? "收起扫描" : "扫描目录" }}</button></div>
+      <div class="button-grid"><button class="secondary" :disabled="workspace.busy" @click="Promise.all([workspace.loadVenvs(undefined, true), workspace.loadPythonVersions(true)])">刷新</button><button class="secondary" :disabled="workspace.busy" @click="showScanPanel = !showScanPanel">{{ showScanPanel ? "收起扫描" : "扫描目录" }}</button></div>
     </div>
     <div class="workspace-columns">
       <article class="card form-card">

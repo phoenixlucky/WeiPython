@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Icon } from "@iconify/vue";
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import { useAppStore } from "@/stores/app";
 import CondaPanel from "@/components/CondaPanel.vue";
 import VenvPanel from "@/components/VenvPanel.vue";
@@ -11,6 +11,7 @@ import SettingsPanel from "@/components/SettingsPanel.vue";
 import UvPanel from "@/components/UvPanel.vue";
 import { useWorkspaceStore } from "@/stores/workspace";
 import { isTauri } from "@/lib/tauri";
+import TaskProgress from "@/components/TaskProgress.vue";
 
 const app = useAppStore();
 const workspace = useWorkspaceStore();
@@ -47,7 +48,6 @@ const previewVenvs = [
   { name: "studio-venv", path: "D:\\Projects\\studio-venv", manager: "venv", pythonVersion: "3.12" },
   { name: "docs-uv", path: "D:\\Projects\\docs-uv", manager: "uv", pythonVersion: "3.13" },
 ];
-let processTimer = 0;
 
 function panelFor(id: string) { return panels.find((panel) => panel.id === id); }
 
@@ -65,10 +65,8 @@ function activateSsvip(skin = activeSkin.value) {
 onMounted(async () => {
   await app.loadSettings();
   if (isTauri) {
-    await Promise.all([app.refresh(), workspace.loadVenvs(), workspace.loadPythonVersions()]);
-    if (app.overview) workspace.conda = app.overview.environments;
+    await Promise.all([app.refresh(), workspace.loadVenvs()]);
     await workspace.loadProcesses().catch(() => undefined);
-    processTimer = window.setInterval(() => { void workspace.loadProcesses().catch(() => undefined); }, 1000);
   } else {
     app.overview = { runtime: { python: "3.14.7", conda: "26.7.2", platform: "Windows" }, environments: previewEnvironments, checkedAt: new Date().toISOString() };
     workspace.conda = previewEnvironments;
@@ -77,7 +75,6 @@ onMounted(async () => {
   }
 });
 
-onUnmounted(() => { if (processTimer) window.clearInterval(processTimer); });
 </script>
 
 <template>
@@ -111,9 +108,9 @@ onUnmounted(() => { if (processTimer) window.clearInterval(processTimer); });
       <div v-if="app.error" class="error-banner global-error-banner" role="alert">{{ app.error }}<button class="link-button" @click="app.error = ''">关闭</button></div>
 
       <section v-if="activePanel === 'overview'" class="content overview-content">
-        <div class="hero-panel" :style="{ '--hero-image': `url(${app.settings.wallpaper || '/assets/illustrations/dashboard-hero.png'})` }">
+        <div class="hero-panel" :style="{ '--hero-image': `url(${app.wallpaperUrl || '/assets/illustrations/dashboard-hero.png'})` }">
           <div class="hero-copy"><span class="eyebrow hero-eyebrow">// Overview</span><h1>系统与运行时总览</h1><p>查看本机 Python 工具链和 Conda 环境状态，轻松管理您的开发环境。</p></div>
-          <button class="hero-refresh" :disabled="app.loading" @click="app.refresh"><Icon icon="ph:arrows-clockwise" :class="{ spin: app.loading }" />{{ app.loading ? "刷新中" : "刷新状态" }}</button>
+          <button class="hero-refresh" :disabled="app.loading" @click="app.refresh(true)"><Icon icon="ph:arrows-clockwise" :class="{ spin: app.loading }" />{{ app.loading ? "刷新中" : "刷新状态" }}</button>
         </div>
 
         <div class="stat-grid">
@@ -125,7 +122,7 @@ onUnmounted(() => { if (processTimer) window.clearInterval(processTimer); });
 
         <div class="dashboard-grid">
           <article class="card environment-card">
-            <div class="card-heading environment-heading"><div class="heading-with-icon"><span class="section-icon"><Icon icon="ph:monitor" /></span><div><h2>可管理环境</h2><p>共 {{ app.overview?.environments.length || 0 }} 个环境，支持 Conda 环境与虚拟环境的统一管理</p></div></div><div class="heading-tools"><span><Icon icon="ph:clock" />{{ app.lastRefreshLabel }}</span><button class="icon-button" aria-label="刷新环境" @click="app.refresh"><Icon icon="ph:arrows-clockwise" /></button></div></div>
+            <div class="card-heading environment-heading"><div class="heading-with-icon"><span class="section-icon"><Icon icon="ph:monitor" /></span><div><h2>可管理环境</h2><p>共 {{ app.overview?.environments.length || 0 }} 个环境，支持 Conda 环境与虚拟环境的统一管理</p></div></div><div class="heading-tools"><span><Icon icon="ph:clock" />{{ app.lastRefreshLabel }}</span><button class="icon-button" aria-label="刷新环境" @click="app.refresh(true)"><Icon icon="ph:arrows-clockwise" /></button></div></div>
             <div class="environment-table-head"><span>环境名称</span><span>环境路径</span><span>版本</span><span>包数量</span><span>操作</span></div>
             <div v-if="!app.overview?.environments.length && !app.loading" class="empty">没有发现 Conda 环境</div>
             <div v-for="environment in app.overview?.environments" :key="environment.prefix" class="environment-row">
@@ -144,7 +141,7 @@ onUnmounted(() => { if (processTimer) window.clearInterval(processTimer); });
       <SetupPanel v-else-if="activePanel === 'setup'" />
       <SettingsPanel v-else-if="activePanel === 'settings'" />
       <section v-else class="content placeholder-page"><span class="eyebrow">// {{ activePanel }}</span><h1>{{ panelFor(activePanel)?.label }}</h1><div class="card"><h2>模块已接入迁移骨架</h2><p>这里将接入 Rust domain/service 能力。当前基础链路已可运行。</p><button class="secondary" @click="activePanel = 'overview'">返回概览</button></div></section>
-      <div v-if="workspace.error || workspace.message || workspace.output || workspace.currentTask" class="operation-log" :class="{ 'operation-error': workspace.error, 'operation-running': workspace.currentTask?.status === 'running' }" role="status" aria-live="polite"><div class="log-head"><span class="log-status-dot"></span><strong>{{ workspace.error || workspace.message || workspace.currentTask?.message || "最近一次操作" }}</strong><span v-if="workspace.currentTask?.status === 'running'">{{ workspace.currentTask.progress }}%</span><button v-if="workspace.currentTask?.status === 'running'" class="link-button" @click="workspace.cancelCurrentTask">取消任务</button><button class="link-button" @click="workspace.clearLog">清空</button></div><div v-if="workspace.currentTask?.status === 'running'" class="task-progress"><span :style="{ width: `${workspace.currentTask.progress}%` }"></span></div><small v-if="workspace.activeProcesses.length" class="process-note">正在运行 {{ workspace.activeProcesses.length }} 个本地进程</small><pre v-if="workspace.output">{{ workspace.output }}</pre></div>
+      <div v-if="workspace.error || workspace.message || workspace.output || workspace.currentTask" class="operation-log" :class="{ 'operation-error': workspace.error, 'operation-running': workspace.currentTask?.status === 'running' }" role="status" aria-live="polite"><div class="log-head"><span class="log-status-dot"></span><strong>{{ workspace.error || workspace.message || workspace.currentTask?.message || "最近一次操作" }}</strong><span v-if="workspace.currentTask?.status === 'running' && workspace.currentTask.progress !== null">{{ workspace.currentTask.progress }}%</span><button v-if="workspace.currentTask?.status === 'running'" class="link-button" @click="workspace.cancelCurrentTask">取消任务</button><button v-if="workspace.taskConnectionLost" class="link-button" @click="workspace.reconnectTask">重新连接任务</button><button class="link-button" @click="workspace.clearLog">清空</button></div><TaskProgress v-if="workspace.currentTask?.status === 'running'" :value="workspace.currentTask.progress" :label="workspace.currentTask.message" /><small v-if="workspace.activeProcesses.length" class="process-note">正在运行 {{ workspace.activeProcesses.length }} 个本地进程</small><pre v-if="workspace.output">{{ workspace.output }}</pre></div>
     </main>
 
     <div v-if="showMembershipModal" class="membership-backdrop" role="presentation" @click.self="showMembershipModal = false">

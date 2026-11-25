@@ -60,13 +60,19 @@ pub struct SetupRequest {
 }
 
 #[tauri::command]
-pub async fn get_overview() -> Result<Overview, String> { crate::services::system_service::get_overview().await }
+pub async fn get_overview(force_refresh: Option<bool>) -> Result<Overview, String> {
+    if force_refresh.unwrap_or(false) { crate::services::invalidate_inventory(); }
+    crate::services::system_service::get_overview().await
+}
 
 #[tauri::command]
 pub fn get_active_processes() -> Vec<crate::services::process_service::ActiveProcess> { crate::services::process_service::active_processes() }
 
 #[tauri::command]
-pub async fn discover_python_versions() -> Result<Vec<String>, String> { Ok(crate::services::system_service::discover_python_versions().await) }
+pub async fn discover_python_versions(force_refresh: Option<bool>) -> Result<Vec<String>, String> {
+    if force_refresh.unwrap_or(false) { crate::services::system_service::invalidate_cache(); }
+    Ok(crate::services::system_service::discover_python_versions().await)
+}
 
 #[tauri::command]
 pub async fn can_upgrade_system_python() -> bool { cfg!(windows) && crate::services::process_service::resolve_program("winget").await.is_some() }
@@ -92,7 +98,15 @@ pub fn start_upgrade_python(path: String) -> crate::services::task_service::Task
 pub async fn get_settings() -> Result<AppSettings, String> { crate::services::storage_service::read_settings().await }
 
 #[tauri::command]
-pub async fn save_settings(settings: AppSettings) -> Result<(), String> { crate::services::storage_service::write_settings(&settings).await }
+pub async fn save_settings(settings: serde_json::Value) -> Result<AppSettings, String> { crate::services::storage_service::update_settings(settings).await }
+
+#[tauri::command]
+pub async fn save_wallpaper(bytes: Vec<u8>) -> Result<String, String> { crate::services::storage_service::save_wallpaper(bytes).await }
+
+#[tauri::command]
+pub async fn read_wallpaper(path: String) -> Result<tauri::ipc::Response, String> {
+    Ok(tauri::ipc::Response::new(crate::services::storage_service::read_wallpaper(path).await?))
+}
 
 #[tauri::command]
 pub async fn get_setup_status() -> Result<SetupStatus, String> { Ok(crate::services::setup_service::status().await) }
@@ -117,7 +131,10 @@ pub fn get_operation_task(task_id: String) -> Result<crate::services::task_servi
 pub fn cancel_operation_task(task_id: String) -> Result<(), String> { crate::services::task_service::cancel(&task_id) }
 
 #[tauri::command]
-pub async fn list_conda_environments() -> Result<Vec<CondaEnvironment>, String> { crate::services::conda_service::list().await }
+pub async fn list_conda_environments(force_refresh: Option<bool>) -> Result<Vec<CondaEnvironment>, String> {
+    if force_refresh.unwrap_or(false) { crate::services::conda_service::invalidate_cache(); }
+    crate::services::conda_service::list().await
+}
 
 #[tauri::command]
 pub async fn create_conda_environment(request: CondaCreateRequest) -> Result<OperationResult, String> {
@@ -208,7 +225,10 @@ pub fn start_upgrade_conda_python(name: String, version: String, channel: String
 }
 
 #[tauri::command]
-pub async fn list_virtual_environments(last_directory: Option<String>) -> Result<Vec<VirtualEnvironment>, String> { Ok(crate::services::venv_service::list(last_directory).await) }
+pub async fn list_virtual_environments(last_directory: Option<String>, force_refresh: Option<bool>) -> Result<Vec<VirtualEnvironment>, String> {
+    if force_refresh.unwrap_or(false) { crate::services::venv_service::invalidate_cache(); }
+    Ok(crate::services::venv_service::list(last_directory).await)
+}
 
 #[tauri::command]
 pub async fn create_virtual_environment(request: VenvCreateRequest) -> Result<OperationResult, String> { crate::services::venv_service::create(request.name, request.target_path, request.python_path, request.manager).await }
@@ -238,7 +258,11 @@ pub fn start_import_uv_environment(request: VenvFileRequest) -> crate::services:
 }
 
 #[tauri::command]
-pub async fn delete_virtual_environment(path: String) -> Result<OperationResult, String> { crate::services::venv_service::remove(path).await }
+pub async fn delete_virtual_environment(path: String) -> Result<OperationResult, String> {
+    let result = crate::services::venv_service::remove(path).await;
+    crate::services::invalidate_inventory();
+    result
+}
 
 #[tauri::command]
 pub async fn list_packages(target: EnvironmentTarget) -> Result<Vec<Package>, String> { crate::services::package_service::list(target).await }
@@ -254,4 +278,42 @@ pub fn start_package_action(request: PackageActionRequest) -> crate::services::t
     crate::services::task_service::start("package", "正在执行包管理操作", async move {
         crate::services::package_service::execute(request.target, request.action, request.package_name, request.package_version, request.index_url, request.requirements_path).await
     })
+}
+
+#[tauri::command]
+pub fn start_create_conda_environment(request: CondaCreateRequest) -> crate::services::task_service::TaskSnapshot {
+    crate::services::task_service::cleanup();
+    crate::services::task_service::start("conda-create", "准备创建 Conda 环境", async move {
+        create_conda_environment(request).await
+    })
+}
+
+#[tauri::command]
+pub fn start_delete_conda_environment(name: String) -> crate::services::task_service::TaskSnapshot {
+    crate::services::task_service::cleanup();
+    crate::services::task_service::start("conda-delete", "正在删除 Conda 环境", async move { delete_conda_environment(name).await })
+}
+
+#[tauri::command]
+pub fn start_export_conda_environment(request: CondaExportRequest) -> crate::services::task_service::TaskSnapshot {
+    crate::services::task_service::cleanup();
+    crate::services::task_service::start("conda-export", "正在导出 Conda 环境", async move { export_conda_environment(request).await })
+}
+
+#[tauri::command]
+pub fn start_export_all_conda_environments(request: CondaExportAllRequest) -> crate::services::task_service::TaskSnapshot {
+    crate::services::task_service::cleanup();
+    crate::services::task_service::start("conda-export", "正在导出全部 Conda 环境", async move { export_all_conda_environments(request).await })
+}
+
+#[tauri::command]
+pub fn start_import_conda_environment(request: CondaImportRequest) -> crate::services::task_service::TaskSnapshot {
+    crate::services::task_service::cleanup();
+    crate::services::task_service::start("conda-import", "正在导入 Conda 环境", async move { import_conda_environment(request).await })
+}
+
+#[tauri::command]
+pub fn start_create_virtual_environment(request: VenvCreateRequest) -> crate::services::task_service::TaskSnapshot {
+    crate::services::task_service::cleanup();
+    crate::services::task_service::start("venv-create", "准备创建虚拟环境", async move { create_virtual_environment(request).await })
 }

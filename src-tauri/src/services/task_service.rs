@@ -11,7 +11,7 @@ pub struct TaskSnapshot {
     pub task_type: String,
     pub status: String,
     pub message: String,
-    pub progress: u8,
+    pub progress: Option<u8>,
     pub output: String,
     pub command: String,
     pub started_at: u64,
@@ -55,6 +55,18 @@ pub fn set_output(value: &str) {
     });
 }
 
+pub fn set_stage(message: &str) {
+    let _ = CURRENT_TASK.try_with(|context| {
+        if let Ok(mut task) = context.snapshot.lock() { task.message = message.into(); task.progress = None; }
+    });
+}
+
+pub fn set_command(command: &str) {
+    let _ = CURRENT_TASK.try_with(|context| {
+        if let Ok(mut task) = context.snapshot.lock() { task.command = command.into(); }
+    });
+}
+
 pub fn current_task_id() -> Option<String> { CURRENT_TASK.try_with(|context| context.task_id.clone()).ok() }
 pub fn is_cancelled() -> bool { CURRENT_TASK.try_with(|context| context.cancel.load(Ordering::Relaxed)).unwrap_or(false) }
 
@@ -76,7 +88,7 @@ where
         task_type: task_type.to_string(),
         status: "running".into(),
         message: message.into(),
-        progress: 5,
+        progress: None,
         output: String::new(),
         command: String::new(),
         started_at: now(),
@@ -89,25 +101,27 @@ where
     task_store().lock().expect("task store lock poisoned").insert(task_id.clone(), TaskEntry { snapshot: task_ref.clone(), cancel: cancel.clone() });
     tauri::async_runtime::spawn(async move {
         let result = CURRENT_TASK.scope(TaskContext { snapshot: task_ref.clone(), cancel: cancel.clone(), task_id: task_id_for_task }, operation).await;
+        crate::services::invalidate_inventory();
         let mut task = task_ref.lock().expect("task lock poisoned");
         task.finished_at = Some(now());
-        if cancel.load(Ordering::Relaxed) {
+        let committed = matches!(&result, Ok(value) if value.ok);
+        if cancel.load(Ordering::Relaxed) && !committed {
             task.status = "cancelled".into();
             task.message = "任务已取消".into();
-            task.progress = 100;
+            task.progress = Some(100);
             if task.output.trim().is_empty() { task.output = "任务已取消".into(); }
         } else { match result {
             Ok(value) => {
-                task.status = "completed".into();
+                task.status = if value.ok { "completed" } else { "failed" }.into();
                 task.message = value.message;
-                task.progress = 100;
+                task.progress = Some(100);
                 task.command = value.command;
                 if task.output.trim().is_empty() { task.output = value.output; }
             }
             Err(error) => {
                 task.status = "failed".into();
                 task.message = error.clone();
-                task.progress = 100;
+                task.progress = Some(100);
                 if task.output.trim().is_empty() { task.output = error; }
             }
         }}
@@ -120,19 +134,15 @@ pub fn snapshot(task_id: &str) -> Option<TaskSnapshot> {
 }
 
 pub fn cancel(task_id: &str) -> Result<(), String> {
-    let cancel = {
+    {
         let tasks = task_store().lock().map_err(|_| "任务状态锁已损坏".to_string())?;
         let entry = tasks.get(task_id).ok_or_else(|| "任务不存在或已过期".to_string())?;
-        if entry.snapshot.lock().map(|task| task.status != "running").unwrap_or(true) { return Ok(()); }
-        entry.cancel.clone()
-    };
-    cancel.store(true, Ordering::Relaxed);
-    crate::services::process_service::terminate_task_processes(task_id);
-    if let Ok(tasks) = task_store().lock() {
-        if let Some(entry) = tasks.get(task_id) {
-            if let Ok(mut task) = entry.snapshot.lock() { task.message = "正在取消任务…".into(); }
-        }
+        let mut task = entry.snapshot.lock().map_err(|_| "任务状态锁已损坏".to_string())?;
+        if task.status != "running" { return Ok(()); }
+        entry.cancel.store(true, Ordering::Relaxed);
+        task.message = "正在取消任务…".into();
     }
+    crate::services::process_service::terminate_task_processes(task_id);
     Ok(())
 }
 
@@ -181,6 +191,31 @@ mod tests {
             }
             assert!(std::time::Instant::now() < deadline, "cancelled task did not finish");
             std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
+    #[test]
+    fn a_committed_success_wins_over_a_late_cancellation() {
+        let release = Arc::new(tokio::sync::Notify::new());
+        let operation_release = release.clone();
+        let task = start("commit-test", "starting", async move {
+            set_stage("committing");
+            operation_release.notified().await;
+            Ok(OperationResult { ok: true, message: "committed".into(), command: "test".into(), output: "saved".into() })
+        });
+        cancel(&task.task_id).unwrap();
+        release.notify_one();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let current = snapshot(&task.task_id).unwrap();
+            if current.status != "running" {
+                assert_eq!(current.status, "completed");
+                assert_eq!(current.message, "committed");
+                assert_eq!(current.progress, Some(100));
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(5));
         }
     }
 }

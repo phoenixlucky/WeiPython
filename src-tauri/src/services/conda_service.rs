@@ -3,6 +3,10 @@ use crate::services::process_service::{failure, resolve_program, run, run_with_e
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use crate::services::scan_service::{ScanCache, SCAN_TTL, bounded_map};
+
+static INVENTORY: ScanCache<Vec<CondaEnvironment>> = ScanCache::new(SCAN_TTL);
+pub fn invalidate_cache() { INVENTORY.invalidate(); }
 
 const ANACONDA_DEFAULT_CHANNELS: [&str; 3] = [
     "https://repo.anaconda.com/pkgs/main",
@@ -140,18 +144,21 @@ fn parse_environment_list(stdout: &str, stderr: &str) -> Result<CondaEnvironment
 }
 
 pub async fn list_prefixes() -> Result<Vec<PathBuf>, String> {
-    let result = run_conda(&["env".into(), "list".into(), "--json".into()]).await?;
-    if !result.ok { return Err(failure(&result, "读取 Conda 环境失败")); }
-    Ok(parse_environment_list(&result.stdout, &result.stderr)?.envs.into_iter().map(PathBuf::from).collect())
+    Ok(list().await?.into_iter().map(|environment| PathBuf::from(environment.prefix)).collect())
 }
 
 pub async fn list() -> Result<Vec<CondaEnvironment>, String> {
+    let program = conda_program().await?;
+    INVENTORY.get(&program, list_uncached).await
+}
+
+async fn list_uncached() -> Result<Vec<CondaEnvironment>, String> {
     let result = run_conda(&["env".into(), "list".into(), "--json".into()]).await?;
     if !result.ok { return Err(failure(&result, "读取 Conda 环境失败")); }
     let parsed = parse_environment_list(&result.stdout, &result.stderr)?;
     let active = std::env::var("CONDA_PREFIX").unwrap_or_default();
     let CondaEnvironmentList { envs, envs_details } = parsed;
-    let mut environments = Vec::with_capacity(envs.len());
+    let mut probes = Vec::with_capacity(envs.len());
     let mut seen = HashSet::new();
     for prefix in envs {
         let normalized = prefix.to_ascii_lowercase();
@@ -165,14 +172,14 @@ pub async fn list() -> Result<Vec<CondaEnvironment>, String> {
                 path.file_name().map(|item| item.to_string_lossy().to_string()).filter(|name| !name.trim().is_empty()).unwrap_or_else(|| "未命名环境".into())
             }
         });
-        environments.push(CondaEnvironment {
-            name,
-            prefix: prefix.clone(),
-            python: python_version(&path).await,
-            package_count: package_count(&path).await,
-            active: metadata.and_then(|item| item.active).unwrap_or(prefix.eq_ignore_ascii_case(&active)),
-        });
+        let is_active = metadata.and_then(|item| item.active).unwrap_or(prefix.eq_ignore_ascii_case(&active));
+        probes.push((name, prefix, is_active));
     }
+    let mut environments = bounded_map(probes, |(name, prefix, active)| async move {
+        let path = PathBuf::from(&prefix);
+        let (python, package_count) = tokio::join!(python_version(&path), package_count(&path));
+        CondaEnvironment { name, prefix, python, package_count, active }
+    }).await;
     environments.sort_by(|left, right| left.name.cmp(&right.name));
     Ok(environments)
 }
@@ -270,6 +277,7 @@ mod tests {
 }
 
 pub async fn create(name: String, mode: String, source: Option<String>, target_python_version: Option<String>, clone_python: bool, clone_packages: bool, python_version_value: Option<String>, channel: Option<String>, packages: Vec<String>) -> Result<OperationResult, String> {
+    crate::services::task_service::set_stage("检查参数并准备 Conda 环境");
     if name.trim().is_empty() { return Err("环境名称不能为空".into()); }
     if name == "." || name == ".." || name.contains(['/', '\\', ':']) { return Err("环境名称不能包含路径分隔符".into()); }
     let mut args = vec!["create".into(), "-n".into(), name.clone()];
@@ -279,11 +287,13 @@ pub async fn create(name: String, mode: String, source: Option<String>, target_p
         if clone_python && clone_packages && target_version.is_none() {
             args.extend(["--clone".into(), source_name]);
         } else {
+            crate::services::task_service::set_stage("读取源环境的依赖配置");
             let exported = run_conda(&["env".into(), "export".into(), "-n".into(), source_name, "--no-builds".into()]).await?;
             if !exported.ok { return Err(failure(&exported, "读取源 Conda 环境失败")); }
             let yaml = rewrite_clone_yaml(&exported.stdout, &name, target_version.as_deref(), clone_python, clone_packages, channel.as_deref());
             let temporary = std::env::temp_dir().join(format!("wj-python-clone-{}-{}.yml", std::process::id(), name));
             tokio::fs::write(&temporary, yaml).await.map_err(|error| format!("写入克隆配置失败: {error}"))?;
+            crate::services::task_service::set_stage("求解依赖并克隆 Conda 环境");
             let result = run_conda(&["env".into(), "create".into(), "-f".into(), temporary.to_string_lossy().to_string(), "-y".into()]).await;
             let _ = tokio::fs::remove_file(&temporary).await;
             let result = result?;
@@ -296,6 +306,7 @@ pub async fn create(name: String, mode: String, source: Option<String>, target_p
         args.extend(packages.into_iter().filter(|value| !value.trim().is_empty()));
     }
     args.push("-y".into());
+    crate::services::task_service::set_stage("求解依赖并创建 Conda 环境");
     let result = run_conda(&args).await?;
     if !result.ok { return Err(failure(&result, "创建 Conda 环境失败")); }
     Ok(OperationResult { ok: true, message: format!("Conda 环境 {name} 创建完成"), command: result.command, output: [result.stdout, result.stderr].into_iter().filter(|value| !value.is_empty()).collect::<Vec<_>>().join("\n") })
@@ -401,6 +412,7 @@ pub async fn export_all(directory: String) -> Result<OperationResult, String> {
 }
 
 pub async fn import(path: String, name: Option<String>) -> Result<OperationResult, String> {
+    crate::services::task_service::set_stage("读取 YAML 并安装环境依赖");
     if !Path::new(&path).is_file() { return Err("YAML 文件不存在".into()); }
     let mut args = vec!["env".into(), "create".into(), "-f".into(), path, "-y".into()];
     if let Some(name) = name.filter(|value| !value.trim().is_empty()) { args.extend(["-n".into(), name]); }

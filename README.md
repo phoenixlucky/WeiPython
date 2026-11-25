@@ -3,7 +3,7 @@
   <h1>WJ Python 管理大师</h1>
   <p>在一个桌面应用中管理 Python、Conda、虚拟环境和软件包</p>
   <p>
-    <a href="https://github.com/phoenixlucky/WeiPython/releases/tag/v3.2.0"><img src="https://img.shields.io/badge/版本-3.2.0-2563EB" alt="版本 3.2.0"></a>
+    <a href="https://github.com/phoenixlucky/WeiPython/releases/tag/v3.2.1"><img src="https://img.shields.io/badge/版本-3.2.1-2563EB" alt="版本 3.2.1"></a>
     <img src="https://img.shields.io/badge/平台-Windows-0A66C2" alt="平台 Windows">
     <a href="LICENSE"><img src="https://img.shields.io/badge/许可证-GPL--3.0-4B5563" alt="GPL-3.0 许可证"></a>
   </p>
@@ -38,10 +38,10 @@ WJ Python 管理大师是一款面向 Windows 的本地 Python 环境管理工�
 
 ## 下载与启动
 
-当前版本：**3.2.0** · [前往 GitHub Releases 下载](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.2.0)
+当前版本：**3.2.1** · [前往 GitHub Releases 下载](https://github.com/phoenixlucky/WeiPython/releases/tag/v3.2.1)
 
 - `*-setup.exe`：安装版，适合日常使用。
-- `WJPythonManager-3.2.0-x64-portable.exe`：Windows x64 便携版，无需安装。
+- `WJPythonManager-3.2.1-x64-portable.exe`：Windows x64 便携版，无需安装。
 
 首次启动后，打开左侧的“初始化配置”，按向导检查 Conda 并设置 Python 环境。
 
@@ -61,6 +61,8 @@ npm run tauri:dev
 ```bash
 npm test
 ```
+
+该命令运行前端状态回归测试和 Rust 测试；需要真实 Conda、Python 或网络的集成测试默认跳过。仅运行前端测试可使用 `npm run test:frontend`。
 
 ## 快速上手
 
@@ -94,6 +96,8 @@ npm test
 - 创建环境、安装软件包和升级 Python 可能需要网络，并受本机权限及软件源状态影响。
 - 删除环境或卸载软件包会修改本机环境；操作前请确认目标。`base` 环境不能直接删除。
 - 设置和运行日志默认保存在本机，不上传到服务器。
+- 设置采用增量保存；自定义壁纸会缩放、压缩后存入应用设置目录下的 `wallpapers` 文件夹，设置文件只记录路径。旧版内嵌图片会自动迁移，迁移失败保留原设置。
+- 环境扫描短期缓存 15 秒，点击刷新可立即重新检测。创建、克隆、导入等耗时操作可查看执行阶段和日志，并可取消；任务连接中断后可点击“重新连接任务”恢复查看。
 - SSVIP 密钥是源码中的本地演示密钥，不是安全凭证或真实付费授权：`greed is good`。
 
 ## 开源协议

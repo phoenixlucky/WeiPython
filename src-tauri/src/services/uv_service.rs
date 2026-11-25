@@ -158,9 +158,7 @@ pub async fn install(version: Option<String>, install_directory: Option<String>)
             return Err(format!("安装版本不匹配：期望 {expected}，实际 {}", check.stdout));
         }
     }
-    let mut settings = crate::services::storage_service::read_settings().await?;
-    settings.uv_path = Some(installed.clone());
-    crate::services::storage_service::write_settings(&settings).await?;
+    crate::services::storage_service::update_settings(serde_json::json!({"uvPath": installed})).await?;
     Ok(OperationResult {
         ok: true,
         message: format!("uv {}完成：{installed}", version.as_deref().map(|value| format!("版本 {value} 安装")).unwrap_or_else(|| "安装".into())),
@@ -204,7 +202,7 @@ pub async fn version(selected: Option<String>) -> Option<String> {
 pub async fn uninstall(installed: String) -> Result<OperationResult, String> {
     let installed = installed.trim().to_string();
     if installed.is_empty() || !Path::new(&installed).is_file() { return Err("所选 uv 路径不存在".into()); }
-    let mut settings = crate::services::storage_service::read_settings().await?;
+    let settings = crate::services::storage_service::read_settings().await?;
     let saved = settings.uv_path.clone();
     if !managed_uv_path(&installed) && saved.as_deref() != Some(installed.as_str()) {
         return Err("检测到的 uv 不在本程序管理的用户目录中，请使用原安装方式卸载".into());
@@ -218,8 +216,7 @@ pub async fn uninstall(installed: String) -> Result<OperationResult, String> {
         }
     }
     if settings.uv_path.as_deref() == Some(installed.as_str()) {
-        settings.uv_path = None;
-        crate::services::storage_service::write_settings(&settings).await?;
+        crate::services::storage_service::update_settings(serde_json::json!({"uvPath": null})).await?;
     }
     Ok(OperationResult { ok: true, message: "uv 已卸载".into(), command: format!("remove {installed}"), output: installed })
 }

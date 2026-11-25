@@ -93,6 +93,13 @@ pub async fn run_with_env(program: &str, args: &[String], cwd: Option<&Path>, en
         let _ = active_store().lock().map(|mut processes| processes.insert(pid, ActiveProcess { pid, command: display.clone(), started_at: unix_now(), task_id }));
     }
     crate::services::task_service::append_output(&format!("\n$ {display}\n"));
+    crate::services::task_service::set_command(&display);
+    if crate::services::task_service::is_cancelled() {
+        if let Some(pid) = pid { terminate_pid(pid); }
+        let _ = child.kill().await;
+        if let Some(pid) = pid { let _ = active_store().lock().map(|mut processes| processes.remove(&pid)); }
+        return ProcessOutput { ok: false, stdout: String::new(), stderr: "任务已取消".into(), command: display };
+    }
     let Some(stdout) = child.stdout.take() else {
         let _ = child.kill().await;
         return ProcessOutput { ok: false, stdout: String::new(), stderr: "无法打开命令标准输出管道".into(), command: display };

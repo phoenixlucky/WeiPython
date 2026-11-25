@@ -28,7 +28,7 @@ async function chooseCondaPath() {
   } catch (cause) { app.error = describeError(cause, "选择 Conda 路径失败"); }
 }
 
-function importWallpaper(event: Event) {
+async function importWallpaper(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0];
   if (!file) return;
   wallpaperError.value = "";
@@ -41,13 +41,9 @@ function importWallpaper(event: Event) {
     return;
   }
   importingWallpaper.value = true;
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    importingWallpaper.value = false;
-    if (typeof reader.result === "string") void app.saveSettings({ wallpaper: reader.result });
-  });
-  reader.addEventListener("error", () => { importingWallpaper.value = false; wallpaperError.value = "读取壁纸失败，请重试。"; });
-  reader.readAsDataURL(file);
+  try { await app.importWallpaper(file); }
+  catch (cause) { wallpaperError.value = describeError(cause, "导入壁纸失败"); }
+  finally { importingWallpaper.value = false; (event.target as HTMLInputElement).value = ""; }
 }
 
 function resetAppearance() {
@@ -65,7 +61,7 @@ function resetAppearance() {
       <article class="card form-card settings-card">
         <div class="settings-section-heading"><div><span class="eyebrow">Workspace</span><h2>工作区</h2></div><span>本机保存</span></div>
         <label>首页标语<input :value="app.settings.tagline" maxlength="60" @change="app.saveSettings({ tagline: ($event.target as HTMLInputElement).value })" /></label>
-        <label>Conda 可执行文件（可选）<div class="input-action"><input :value="app.settings.condaPath || ''" placeholder="D:\ProgramData\miniconda3\Scripts\conda.exe" @change="app.saveSettings({ condaPath: ($event.target as HTMLInputElement).value.trim() || undefined })" /><button class="secondary" type="button" @click="chooseCondaPath">选择</button></div></label>
+        <label>Conda 可执行文件（可选）<div class="input-action"><input :value="app.settings.condaPath || ''" placeholder="D:\ProgramData\miniconda3\Scripts\conda.exe" @change="app.saveSettings({ condaPath: ($event.target as HTMLInputElement).value.trim() || null })" /><button class="secondary" type="button" @click="chooseCondaPath">选择</button></div></label>
         <p class="hint">填写后将优先使用该 Conda 路径，适合未加入 PATH 的安装。</p>
         <label>背景壁纸<input type="file" accept="image/png,image/jpeg,image/webp" :disabled="importingWallpaper" @change="importWallpaper" /></label>
         <p v-if="wallpaperError" class="field-error" role="alert">{{ wallpaperError }}</p>
@@ -86,7 +82,7 @@ function resetAppearance() {
         </div>
         <label class="switch-row"><input type="checkbox" :checked="app.settings.compactMode" @change="app.saveSettings({ compactMode: ($event.target as HTMLInputElement).checked })" />紧凑布局<span class="field-note">减少卡片间距，适合小屏幕</span></label>
       </article>
-      <aside class="card settings-preview" :style="{ '--preview-primary': app.settings.primary, '--preview-secondary': app.settings.secondary, '--preview-ink': app.settings.ink, backgroundImage: `url(${app.settings.wallpaper || defaultWallpaper})` }">
+      <aside class="card settings-preview" :style="{ '--preview-primary': app.settings.primary, '--preview-secondary': app.settings.secondary, '--preview-ink': app.settings.ink, backgroundImage: `url(${app.wallpaperUrl || defaultWallpaper})` }">
         <span class="eyebrow">Preview</span>
         <h2>外观预览</h2>
         <div class="preview-window">

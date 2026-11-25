@@ -49,12 +49,12 @@ const filteredPackages = computed(() => {
 });
 
 watch(() => workspace.targets, (targets) => {
-  if (!form.targetKey && targets[0]) form.targetKey = JSON.stringify(targets[0]);
+  if (!targets.some((target) => JSON.stringify(target) === form.targetKey)) form.targetKey = targets[0] ? JSON.stringify(targets[0]) : "";
 }, { immediate: true });
 
 watch(selectedTarget, (target) => {
-  if (target) void workspace.loadPackages(target);
-});
+  void workspace.loadPackages(target || null);
+}, { immediate: true });
 
 watch(selectedPackageVersion, (version) => {
   if (!version && form.versionChoice === "installed") form.versionChoice = "latest";
@@ -74,11 +74,7 @@ async function installRecommended() {
   const target = selectedTarget.value;
   const packages = [...form.recommendedPackages];
   if (!target) return;
-  for (const packageName of packages) {
-    form.packageName = packageName;
-    await workspace.packageAction({ target, action: "install", packageName, indexUrl: form.indexUrl, requirementsPath: form.requirementsPath });
-    if (workspace.error) break;
-  }
+  await workspace.installPackages({ ...target }, packages, form.indexUrl);
 }
 
 function uninstallPackage() {

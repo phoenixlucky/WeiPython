@@ -39,17 +39,18 @@ async fn install_miniconda(path: &str) -> Result<OperationResult, String> {
 }
 
 pub async fn initialize(install_path: String) -> Result<OperationResult, String> {
+    crate::services::task_service::set_stage("检测现有 Conda");
     let install_path = install_path.trim();
     if install_path.is_empty() { return Err("Miniconda 安装目录不能为空".into()); }
     if let Some(path) = resolve_program("conda").await {
         return Ok(OperationResult { ok: true, message: "已检测到 Conda，无需重复安装".into(), command: path, output: "Conda 已可用".into() });
     }
 
+    crate::services::task_service::set_stage("下载并安装 Miniconda");
     let result = install_miniconda(install_path).await?;
+    crate::services::task_service::set_stage("验证安装并保存 Conda 路径");
     let executable = PathBuf::from(install_path).join("Scripts").join("conda.exe");
     if !executable.is_file() { return Err("安装结束但未找到 conda.exe".into()); }
-    let mut settings = crate::services::storage_service::read_settings().await?;
-    settings.conda_path = Some(executable.to_string_lossy().to_string());
-    crate::services::storage_service::write_settings(&settings).await?;
+    crate::services::storage_service::update_settings(serde_json::json!({"condaPath": executable.to_string_lossy()})).await?;
     Ok(result)
 }

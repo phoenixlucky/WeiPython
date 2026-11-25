@@ -4,6 +4,10 @@ use crate::services::process_service::{failure, resolve_program, run};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::services::scan_service::{ScanCache, SCAN_TTL, bounded_map};
+
+static PYTHON_INVENTORY: ScanCache<Vec<String>> = ScanCache::new(SCAN_TTL);
+pub fn invalidate_cache() { PYTHON_INVENTORY.invalidate(); }
 
 async fn command_output(program: &str, args: &[&str]) -> String {
     let Some(executable) = resolve_program(program).await else { return "未检测到".into() };
@@ -32,6 +36,10 @@ pub async fn get_overview() -> Result<Overview, String> {
 }
 
 pub async fn discover_python_versions() -> Vec<String> {
+    PYTHON_INVENTORY.get("python", || async { Ok(discover_python_uncached().await) }).await.unwrap_or_default()
+}
+
+async fn discover_python_uncached() -> Vec<String> {
     let mut candidates = Vec::new();
 
     if cfg!(windows) {
@@ -84,16 +92,13 @@ pub async fn discover_python_versions() -> Vec<String> {
     }
 
     let mut seen = HashSet::new();
-    let mut versions = Vec::new();
-    for executable in executables {
+    executables.retain(|executable| {
         let key = executable.to_string_lossy().to_ascii_lowercase();
-        if !seen.insert(key) || is_blocked_windows_alias(&executable) || is_managed_python(&executable, &conda_prefixes) {
-            continue;
-        }
-        if let Some(version) = python_version_at(&executable).await {
-            versions.push(format!("{version} ({})", executable.to_string_lossy()));
-        }
-    }
+        seen.insert(key) && !is_blocked_windows_alias(executable) && !is_managed_python(executable, &conda_prefixes)
+    });
+    let mut versions: Vec<_> = bounded_map(executables, |executable| async move {
+        python_version_at(&executable).await.map(|version| format!("{version} ({})", executable.to_string_lossy()))
+    }).await.into_iter().flatten().collect();
     sort_python_versions(&mut versions);
     versions
 }
@@ -328,7 +333,23 @@ mod tests {
             assert_ne!(environment.python, "未知");
             println!("{}: {} ({})", environment.name, environment.python, environment.prefix);
         }
-        assert!(!super::discover_python_versions().await.is_empty());
+        // A Conda-only machine legitimately has no standalone system interpreters.
+        for entry in super::discover_python_versions().await {
+            let (_, path) = entry.rsplit_once(" (").expect("each interpreter includes its path");
+            let path = std::path::PathBuf::from(path.trim_end_matches(')'));
+            assert!(path.is_file());
+            let prefixes: Vec<_> = overview.environments.iter().map(|environment| std::path::PathBuf::from(&environment.prefix)).collect();
+            assert!(!super::is_managed_python(&path, &prefixes));
+        }
+        crate::services::conda_service::invalidate_cache();
+        let cold_start = std::time::Instant::now();
+        let cold = crate::services::conda_service::list().await.unwrap();
+        let cold_time = cold_start.elapsed();
+        let warm_start = std::time::Instant::now();
+        let warm = crate::services::conda_service::list().await.unwrap();
+        let warm_time = warm_start.elapsed();
+        assert_eq!(cold.iter().map(|environment| &environment.prefix).collect::<Vec<_>>(), warm.iter().map(|environment| &environment.prefix).collect::<Vec<_>>());
+        println!("Conda scan: cold {cold_time:?}; cached {warm_time:?}");
     }
 
     #[test]
